@@ -6,11 +6,10 @@
 
 > **«Легче ветра»** — парящий раннер с атмосферой рассвета, физикой невесомости и управлением одной кнопкой.
 
-![Screenshot](https://via.placeholder.com/1000x600?text=Sunrise+Preview)
 
 ## Играть
 
-[Открыть демо](#) *(добавьте ссылку на GitHub Pages или свой хостинг)*
+[Открыть демо](https://oiwiio.github.io/sunrise/)
 
 ## О проекте
 
@@ -56,22 +55,11 @@
 - **Vanilla JavaScript** — без фреймворков
 - **CSS** — адаптивный интерфейс
 
-## Структура проекта
-sunrise/
-├── index.html # Главная страница
-├── css/
-│ └── style.css # Стили и адаптивность
-├── js/
-│ └── game.js # Вся игровая логика
-├── assets/ # (опционально) звуки, шрифты
-├── README.md
-└── CHANGELOG.md
 
-text
 
 ## Запуск локально
 
 ```bash
-git clone https://github.com/your-username/sunrise.git
+git clone https://github.com/oiwiio/sunrise
 cd sunrise
 # Просто откройте index.html в браузере
