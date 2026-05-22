@@ -29,7 +29,7 @@
     const DIVE_FORCE = 0.18;
     const LIFT_FORCE = 0.11;
     const MAX_VY = 3.8;
-    const MAX_VX_GROWTH = 9.2;
+    const MAX_VX_GROWTH = 7.5;
     const WIND_BOOST = 0.008; // ускорение от ветра
     
     let mountainSegments = [];
