@@ -2,8 +2,20 @@
     const canvas = document.getElementById('gameCanvas');
     const ctx = canvas.getContext('2d');
     
-    canvas.width = 1000;
-    canvas.height = 600;
+    function resizeCanvas() {
+    const dpr = window.devicePixelRatio || 1;
+
+    canvas.width = window.innerWidth * dpr;
+    canvas.height = window.innerHeight * dpr;
+
+    canvas.style.width = window.innerWidth + 'px';
+    canvas.style.height = window.innerHeight + 'px';
+
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+
+resizeCanvas();
+window.addEventListener('resize', resizeCanvas);
     
     let gameRunning = true;
     let score = 0;
@@ -442,7 +454,6 @@
         
         ctx.font = 'italic 12px monospace';
         ctx.fillStyle = "#f7e5c2";
-        ctx.fillText(`SUNRISE · невесомость · скорость · ветер`, canvas.width - 210, 35);
         
         if (!gameRunning) {
             ctx.font = 'bold 34px monospace';
@@ -531,4 +542,6 @@
         requestAnimationFrame(animate);
     }
     animate();
+
+    
 })();
