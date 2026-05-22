@@ -1,25 +1,16 @@
 (function() {
     const canvas = document.getElementById('gameCanvas');
     const ctx = canvas.getContext('2d');
-    
-    function resizeCanvas() {
-    const dpr = window.devicePixelRatio || 1;
 
-    canvas.width = window.innerWidth * dpr;
-    canvas.height = window.innerHeight * dpr;
+    canvas.width = 1000;
+    canvas.height = 600;
 
-    canvas.style.width = window.innerWidth + 'px';
-    canvas.style.height = window.innerHeight + 'px';
-
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-}
-
-resizeCanvas();
-window.addEventListener('resize', resizeCanvas);
-    
     let gameRunning = true;
     let score = 0;
     let highScore = 0;
+    
+    //привественный экран
+    let showWelcome = true;  // показываем только при первой загрузке
     
     // игрок с полной физикой (двигается и по X, и по Y)
     let player = {
@@ -46,6 +37,7 @@ window.addEventListener('resize', resizeCanvas);
     
     let thermals = [];
     let downdrafts = [];
+
     const THERMAL_GEN_RATE = 85;
     const THERMAL_MAX = 7;
     const DOWNDRAFT_GEN_RATE = 110;
@@ -60,6 +52,13 @@ window.addEventListener('resize', resizeCanvas);
         let saved = localStorage.getItem('sunrise_lightness');
         if (saved && !isNaN(parseInt(saved))) highScore = parseInt(saved);
     } catch(e) {}
+    
+    // ---------- ФУНКЦИЯ ЗАПУСКА ИГРЫ С ПРИВЕТСТВЕННОГО ЭКРАНА ----------
+    function startGameFromWelcome() {
+        showWelcome = false;
+        gameRunning = true;
+        restartGame();
+    }
     
     //горы
     function initMountains() {
@@ -307,8 +306,92 @@ window.addEventListener('resize', resizeCanvas);
         }
     }
     
+    // привественный экран
+    function drawWelcomeScreen() {
+        // тёмный градиентный фон
+        let grad = ctx.createLinearGradient(0, 0, 0, canvas.height);
+        grad.addColorStop(0, '#2B1F3D');
+        grad.addColorStop(1, '#0a0c14');
+        ctx.fillStyle = grad;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        
+        // Рассветное солнце
+        ctx.beginPath();
+        ctx.arc(canvas.width - 60, 70, 38, 0, Math.PI * 2);
+        ctx.fillStyle = '#FFA471';
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(canvas.width - 60, 70, 28, 0, Math.PI * 2);
+        ctx.fillStyle = '#FFD89C';
+        ctx.fill();
+        
+        // силуэты гор на фоне
+        ctx.fillStyle = '#1D142B';
+        for (let i = 0; i < 5; i++) {
+            let x = i * 180 - (frame * 0.3) % 180;
+            ctx.beginPath();
+            ctx.moveTo(x, canvas.height);
+            ctx.lineTo(x + 60, canvas.height - 40);
+            ctx.lineTo(x + 120, canvas.height - 20);
+            ctx.lineTo(x + 180, canvas.height);
+            ctx.fill();
+        }
+        
+        // заголовок
+        ctx.font = 'bold 56px "Segoe UI", "Courier New", monospace';
+        ctx.fillStyle = '#FFF9E8';
+        ctx.shadowBlur = 8;
+        ctx.shadowColor = 'rgba(0,0,0,0.5)';
+        ctx.fillText('SUNRISE', canvas.width / 2 - 130, canvas.height / 2 - 80);
+        ctx.shadowBlur = 0;
+        
+        // подзаголовок (пустая строка, можно убрать или оставить)
+        ctx.font = '18px monospace';
+        ctx.fillStyle = '#FFD6A5';
+        ctx.fillText('', canvas.width / 2 - 85, canvas.height / 2 - 30);
+        
+        // описание управления
+        ctx.font = '14px monospace';
+        ctx.fillStyle = '#ffd9b5';
+        ctx.fillText('ЗАЖМИ — ПИКИРУЙ', canvas.width / 2 - 100, canvas.height / 2 + 40);
+        ctx.fillText('ОТПУСТИ — ПАРИ', canvas.width / 2 - 90, canvas.height / 2 + 68);
+        
+        // подсказка для мобильных (всегда показываем на приветственном экране)
+        ctx.fillText('ПОВЕРНИТЕ ТЕЛЕФОН', canvas.width / 2 - 100, canvas.height / 2 + 105);
+        ctx.fillText('ДЛЯ КОМФОРТНОЙ ИГРЫ', canvas.width / 2 - 100, canvas.height / 2 + 125);
+    
+        // визуальная подсказка
+        ctx.font = 'bold 18px monospace';
+        ctx.fillStyle = '#FFCF9A';
+        ctx.fillText('--> ЛЮБОЕ НАЖАТИЕ <--', canvas.width / 2 - 110, canvas.height / 2 + 165);
+        
+        // рекорд
+        if (highScore > 0) {
+            ctx.font = '13px monospace';
+            ctx.fillStyle = '#c9b28b';
+            ctx.fillText(`лучший полёт: ${highScore} ✦`, canvas.width / 2 - 80, canvas.height - 60);
+        }
+        
+        // парящие частицы
+        for (let i = 0; i < 12; i++) {
+            let x = (frame * 0.2 + i * 37) % (canvas.width + 100) - 50;
+            let y = 80 + Math.sin(frame * 0.02 + i) * 25;
+            ctx.fillStyle = `rgba(255, 215, 150, ${0.2 + Math.sin(frame * 0.05 + i) * 0.1})`;
+            ctx.beginPath();
+            ctx.arc(x, y, 2 + Math.sin(frame * 0.07 + i) * 1, 0, Math.PI * 2);
+            ctx.fill();
+        }
+    }
+    
     //отрисовка
     function draw() {
+        // если показываем приветственный экран — рисуем его и выходим
+        if (showWelcome) {
+            drawWelcomeScreen();
+            frame++;
+            return;
+        }
+        
         const camY = cameraY();
         
         //небо
@@ -330,7 +413,9 @@ window.addEventListener('resize', resizeCanvas);
 
         ctx.fillStyle = 'rgba(255,255,255,0.4)';
         ctx.font = '12px monospace';
-        ctx.fillText('ПРЕДЕЛ ВЫСОТЫ', canvas.width - 160, 24 - camY);
+        if (24 - camY > 20 && 24 - camY < canvas.height - 20) {
+            ctx.fillText('ПРЕДЕЛ ВЫСОТЫ', canvas.width - 160, 24 - camY);
+        }
         
         //солнце
         ctx.beginPath();
@@ -455,6 +540,7 @@ window.addEventListener('resize', resizeCanvas);
         ctx.font = 'italic 12px monospace';
         ctx.fillStyle = "#f7e5c2";
         
+        
         if (!gameRunning) {
             ctx.font = 'bold 34px monospace';
             ctx.fillStyle = '#FFF3DF';
@@ -490,8 +576,15 @@ window.addEventListener('resize', resizeCanvas);
         for (let i = 0; i < 2; i++) addThermalIfNeeded();
     }
     
-    //управление
+    //управление с поддержкой приветственного экрана
     function handlePressStart(e) {
+        // если показываем приветственный экран — запускаем игру
+        if (showWelcome) {
+            startGameFromWelcome();
+            e.preventDefault();
+            return;
+        }
+        
         if (!gameRunning) {
             restartGame();
             return;
@@ -501,6 +594,7 @@ window.addEventListener('resize', resizeCanvas);
     }
     
     function handlePressEnd(e) {
+        if (showWelcome) return;
         if (!gameRunning) return;
         isPressing = false;
         e.preventDefault();
@@ -537,11 +631,9 @@ window.addEventListener('resize', resizeCanvas);
     bindControls();
     
     function animate() {
-        if (gameRunning) updateGame();
+        if (gameRunning && !showWelcome) updateGame();
         draw();
         requestAnimationFrame(animate);
     }
     animate();
-
-    
 })();

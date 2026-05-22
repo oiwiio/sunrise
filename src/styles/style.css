@@ -6,53 +6,41 @@
     -webkit-user-select: none;
     -webkit-tap-highlight-color: transparent;
 }
+
 html,
 body {
+    margin: 0;
     width: 100%;
     height: 100%;
     overflow: hidden;
-    overscroll-behavior: none;
-    touch-action: none;
-}
-body {
     background: #0a0c14;
+}
+
+body {
     display: flex;
     justify-content: center;
     align-items: center;
-    font-family: 'Segoe UI', 'Courier New', monospace;
-    padding:
-        env(safe-area-inset-top)
-        env(safe-area-inset-right)
-        env(safe-area-inset-bottom)
-        env(safe-area-inset-left);
 }
-
 canvas {
     display: block;
     width: 100vw;
     height: 100vh;
-    max-width: 100vw;
-    max-height: 100vh;
     object-fit: contain;
-    cursor: pointer;
-    box-shadow:
-        0 20px 35px rgba(0, 0, 0, 0.45),
-        0 0 120px rgba(255, 180, 120, 0.05);
-    background: #000;
+    background: #0a0c14;
 }
 
+/* интерфейсные элементы — фиксированные, не зависят от масштаба canvas */
 .info {
     position: fixed;
     left: 50%;
-    bottom: max(18px, env(safe-area-inset-bottom));
     transform: translateX(-50%);
+    bottom: max(18px, env(safe-area-inset-bottom));
     pointer-events: none;
     color: #ffd9b5;
     font-size: 14px;
     font-weight: 500;
     letter-spacing: 1px;
-    text-shadow:
-        0 1px 3px rgba(0,0,0,0.8);
+    text-shadow: 0 1px 3px rgba(0,0,0,0.8);
     background: rgba(10, 12, 20, 0.55);
     backdrop-filter: blur(6px);
     -webkit-backdrop-filter: blur(6px);
@@ -60,6 +48,7 @@ canvas {
     border-radius: 999px;
     z-index: 20;
     border: 1px solid rgba(255,255,255,0.05);
+    white-space: nowrap;
 }
 
 .restart-tip {
@@ -79,51 +68,129 @@ canvas {
     border: 1px solid rgba(255,255,255,0.04);
 }
 
+/* оверлей для поворота экрана */
+.rotate-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(10, 12, 20, 0.95);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    z-index: 1000;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    flex-direction: column;
+    transition: all 0.3s ease;
+}
 
-@media (max-width: 900px) {
-    .info {
-        font-size: 11px;
-        padding: 6px 14px;
-        letter-spacing: 0.5px;
-    }
-    .restart-tip {
-        font-size: 10px;
-        padding: 5px 10px;
+.rotate-message {
+    text-align: center;
+    color: #ffd9b5;
+    font-family: 'Segoe UI', 'Courier New', monospace;
+    animation: fadeIn 0.5s ease;
+}
+
+.rotate-icon {
+    font-size: 64px;
+    margin-bottom: 20px;
+    animation: rotateHint 2s ease-in-out infinite;
+}
+
+.rotate-text {
+    font-size: 24px;
+    font-weight: bold;
+    letter-spacing: 2px;
+    margin-bottom: 12px;
+    text-shadow: 0 2px 5px rgba(0,0,0,0.5);
+}
+
+.rotate-hint {
+    font-size: 16px;
+    opacity: 0.8;
+    margin-bottom: 8px;
+}
+
+.rotate-sub {
+    font-size: 12px;
+    opacity: 0.6;
+    letter-spacing: 1px;
+}
+
+/* Анимации */
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+@keyframes rotateHint {
+    0% { transform: rotate(0deg); }
+    50% { transform: rotate(90deg); }
+    100% { transform: rotate(0deg); }
+}
+
+/* Скрываем оверлей на десктопах и в альбомной ориентации */
+@media (orientation: landscape) {
+    .rotate-overlay {
+        display: none !important;
     }
 }
 
-@media (max-width: 600px) {
-    body {
-        align-items: stretch;
-        justify-content: stretch;
+/* Для очень маленьких экранов в портрете */
+@media (max-width: 768px) and (orientation: portrait) {
+    .rotate-text {
+        font-size: 20px;
     }
-    canvas {
-        width: 100vw;
-        height: 100vh;
-        border-radius: 0;
-        box-shadow: none;
+    .rotate-icon {
+        font-size: 52px;
     }
+    .rotate-hint {
+        font-size: 14px;
+    }
+}
+
+/* мобильные экраны */
+@media (max-width: 768px) {
     .info {
         font-size: 10px;
-        bottom: max(10px, env(safe-area-inset-bottom));
         padding: 5px 12px;
+        bottom: max(12px, env(safe-area-inset-bottom));
+        white-space: normal;
+        text-align: center;
+        max-width: 85%;
+        line-height: 1.3;
     }
     .restart-tip {
+        font-size: 9px;
+        padding: 4px 10px;
         top: max(10px, env(safe-area-inset-top));
         right: max(10px, env(safe-area-inset-right));
-        font-size: 9px;
-        padding: 4px 9px;
     }
 }
-@media (max-height: 500px) and (orientation: landscape) {
 
+/* маленькие телефоны */
+@media (max-width: 480px) {
     .info {
         font-size: 9px;
         padding: 4px 10px;
     }
-
     .restart-tip {
         font-size: 8px;
         padding: 3px 8px;
+    }
+}
+
+/* альбомная ориентация на телефонах */
+@media (max-height: 500px) and (orientation: landscape) {
+    .info {
+        font-size: 8px;
+        padding: 3px 8px;
+        bottom: max(5px, env(safe-area-inset-bottom));
+    }
+    .restart-tip {
+        font-size: 7px;
+        padding: 2px 6px;
     }
 }
