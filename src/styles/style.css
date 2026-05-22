@@ -1,0 +1,73 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+}
+
+body {
+    background: #0a0c14;
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-family: 'Segoe UI', 'Courier New', monospace;
+    overflow: hidden;
+    touch-action: manipulation;
+}
+
+canvas {
+    display: block;
+    width: 100%;
+    height: auto;
+    max-width: 1200px;
+    box-shadow: 0 20px 35px rgba(0, 0, 0, 0.4);
+    cursor: pointer;
+}
+
+.info {
+    position: fixed;
+    bottom: 18px;
+    left: 0;
+    right: 0;
+    text-align: center;
+    pointer-events: none;
+    color: #ffd9b5;
+    font-size: 14px;
+    text-shadow: 0 1px 3px #0a0c14;
+    background: rgba(10, 12, 20, 0.5);
+    backdrop-filter: blur(4px);
+    width: fit-content;
+    margin: 0 auto;
+    padding: 6px 16px;
+    border-radius: 60px;
+    font-weight: 500;
+    letter-spacing: 1px;
+    z-index: 20;
+}
+
+.restart-tip {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    background: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(4px);
+    padding: 6px 12px;
+    border-radius: 40px;
+    font-size: 12px;
+    color: #ffcf9a;
+    font-family: monospace;
+    pointer-events: none;
+    z-index: 20;
+}
+
+@media (max-width: 700px) {
+    .info {
+        font-size: 10px;
+        bottom: 12px;
+    }
+    .restart-tip {
+        font-size: 9px;
+    }
+}
