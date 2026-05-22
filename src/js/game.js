@@ -127,17 +127,20 @@
         }
     }
     
-    //частицы
+    //частицы ветра (полноэкранные)
     function addWindParticle() {
         let intensity = Math.min(1.2, player.vx / 9);
-        if (Math.random() > 0.45 + intensity * 0.2) return;
+        // частота появления зависит от скорости ветра
+        if (Math.random() > 0.3 + intensity * 0.2) return;
+        
         windParticles.push({
-            x: canvas.width - 10,
-            y: (player.y - cameraY()) - 5 + (Math.random() - 0.5) * 32,
-            size: 2 + Math.random() * 5,
-            life: 1,
-            vx: -(2 + Math.random() * 7 + player.vx * 0.9),
-            vy: (Math.random() - 0.5) * 1.2
+            x: canvas.width + 20 + Math.random() * 100,  // за правым краем
+            y: Math.random() * canvas.height,            // случайная высота по всему экрану
+            size: 2 + Math.random() * 6,
+            life: 0.8 + Math.random() * 0.5,
+            vx: -(3 + Math.random() * 8 + player.vx * 0.8),
+            vy: (Math.random() - 0.5) * 1.5,
+            opacity: 0.3 + Math.random() * 0.5
         });
     }
     
@@ -159,8 +162,8 @@
             let p = windParticles[i];
             p.x += p.vx;
             p.y += p.vy;
-            p.life -= 0.022;
-            if (p.x < -50 || p.x > canvas.width + 100 || p.life <= 0) {
+            p.life -= 0.008;  // медленнее исчезают
+            if (p.x < -100 || p.life <= 0) {
                 windParticles.splice(i, 1);
                 i--;
             }
@@ -567,9 +570,12 @@
         ctx.restore();
         
         //частицы
-        for (let p of windParticles) {
-            ctx.fillStyle = `rgba(255, 255, 200, ${p.life * 0.6})`;
-            ctx.fillRect(p.x, p.y, p.size * 0.8, p.size * 0.6);
+         for (let p of windParticles) {
+            ctx.fillStyle = `rgba(255, 255, 210, ${p.life * p.opacity * 0.5})`;
+            ctx.beginPath();
+            // вытянутые капли/линии ветра
+            ctx.ellipse(p.x, p.y, p.size * 0.8, p.size * 0.3, 0, 0, Math.PI * 2);
+            ctx.fill();
         }
         for (let s of sparkParticles) {
             ctx.fillStyle = `rgba(255, 220, 140, ${s.life * 0.9})`;
