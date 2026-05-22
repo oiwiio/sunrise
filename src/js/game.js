@@ -8,6 +8,9 @@
     let gameRunning = true;
     let score = 0;
     let highScore = 0;
+
+    let highScorePosition = 0; 
+    let showFlag = false;          
     
     //привественный экран
     let showWelcome = true;  // показываем только при первой загрузке
@@ -278,7 +281,7 @@
         addThermalIfNeeded();
         addDowndraftIfNeeded();
         
-        // 9. Генерация гор
+        // генерация гор
         if (mountainSegments.length > 0) {
             let lastBlock = mountainSegments[mountainSegments.length - 1];
             if (lastBlock.x < cameraX + canvas.width + 200) {
@@ -289,8 +292,8 @@
         }
         
         //счет
-        let speedBonus = Math.floor(player.vx * 1.2);
-        score += 1 + Math.min(7, speedBonus);
+        let speedBonus = Math.floor(player.vx * 0.25);
+        score += 0.2 + Math.min(1.5, speedBonus);
         
         //плавный возврат угла
         player.angle *= 0.97;
@@ -300,8 +303,10 @@
         updateParticles();
         
         //рекорд
-        if (Math.floor(score) > highScore) {
+         if (Math.floor(score) > highScore) {
             highScore = Math.floor(score);
+            highScorePosition = player.x;  // запоминаем позицию
+            showFlag = true;
             try { localStorage.setItem('sunrise_lightness', highScore); } catch(e) {}
         }
     }
@@ -315,7 +320,7 @@
         ctx.fillStyle = grad;
         ctx.fillRect(0, 0, canvas.width, canvas.height);
         
-        // Рассветное солнце
+        // рассветное солнце
         ctx.beginPath();
         ctx.arc(canvas.width - 60, 70, 38, 0, Math.PI * 2);
         ctx.fillStyle = '#FFA471';
@@ -379,6 +384,56 @@
             ctx.fillStyle = `rgba(255, 215, 150, ${0.2 + Math.sin(frame * 0.05 + i) * 0.1})`;
             ctx.beginPath();
             ctx.arc(x, y, 2 + Math.sin(frame * 0.07 + i) * 1, 0, Math.PI * 2);
+            ctx.fill();
+        }
+    }
+
+        //флажек рекорда
+    function drawRecordFlag(currentX, camY) {
+        if (!showFlag) return;
+        
+        // флаг появляется только если игрок ещё не прошел это место
+        if (player.x < highScorePosition - 50) return;
+        
+        const screenX = highScorePosition - cameraX;
+        
+        // Не рисуем, если флаг далеко за пределами экрана
+        if (screenX < -50 || screenX > canvas.width + 50) return;
+        
+        // древко флага
+        ctx.beginPath();
+        ctx.moveTo(screenX, 50 - camY);
+        ctx.lineTo(screenX, 150 - camY);
+        ctx.lineWidth = 3;
+        ctx.strokeStyle = '#FFD966';
+        ctx.stroke();
+        
+        // полотнище флага
+        ctx.beginPath();
+        ctx.moveTo(screenX, 50 - camY);
+        ctx.lineTo(screenX + 35, 65 - camY);
+        ctx.lineTo(screenX, 80 - camY);
+        ctx.fillStyle = '#FFA471';
+        ctx.fill();
+        
+        // звездочка/символ рекорда на флаге
+        ctx.font = '20px monospace';
+        ctx.fillStyle = '#FFF9E8';
+        ctx.fillText('✦', screenX + 8, 73 - camY);
+        
+        // маленькая табличка с числом
+        ctx.font = '10px monospace';
+        ctx.fillStyle = '#FFD6A5';
+        ctx.shadowBlur = 0;
+        ctx.fillText(`${highScore}`, screenX + 12, 97 - camY);
+        
+        // эффект пульсации
+        let distance = Math.abs(player.x - highScorePosition);
+        if (distance < 150) {
+            let pulse = 0.8 + Math.sin(Date.now() * 0.008) * 0.2;
+            ctx.beginPath();
+            ctx.arc(screenX, 65 - camY, 20 * pulse, 0, Math.PI * 2);
+            ctx.fillStyle = `rgba(255, 215, 150, ${0.15 * (1 - distance/150)})`;
             ctx.fill();
         }
     }
@@ -481,6 +536,9 @@
             ctx.fill();
         }
         
+        //отрисовка флага рекорда
+        drawRecordFlag(player.x, camY);
+
         //игрок
         ctx.save();
         ctx.translate(player.x - cameraX, player.y - camY);
