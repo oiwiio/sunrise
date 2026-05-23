@@ -61,6 +61,127 @@
     let frame = 0;
     const FRAME_TIME = 1000 / 60;
     let lastUpdate = 0;
+
+    // ============ ЗВУК (Web Audio API) ============
+    let audioCtx = null;
+    let windGain = null, windFilterHigh = null;
+    let windNode = null;
+    let audioReady = false;
+
+    function makeWindNode() {
+        // белый шум через ScriptProcessor — бесконечный поток случайных сэмплов
+        let bufferSize = 4096;
+        let node = audioCtx.createScriptProcessor(bufferSize, 1, 1);
+        node.onaudioprocess = function(e) {
+            let out = e.outputBuffer.getChannelData(0);
+            for (let i = 0; i < bufferSize; i++) out[i] = Math.random() * 2 - 1;
+        };
+        return node;
+    }
+
+    function initAudio() {
+        if (audioReady) return;
+        try {
+            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+            // белый шум → bandpass (вырезает узкую полосу "свиста") → lowpass (срезает визг) → gain
+            windNode = makeWindNode();
+
+            // bandpass — даёт характерный "шелест" ветра
+            let bandpass = audioCtx.createBiquadFilter();
+            bandpass.type = 'bandpass';
+            bandpass.frequency.value = 600;
+            bandpass.Q.value = 0.8;
+
+            // lowpass — убирает всё резкое сверху
+            windFilterHigh = audioCtx.createBiquadFilter();
+            windFilterHigh.type = 'lowpass';
+            windFilterHigh.frequency.value = 1200;
+
+            windGain = audioCtx.createGain();
+            windGain.gain.value = 0;
+
+            windNode.connect(bandpass);
+            bandpass.connect(windFilterHigh);
+            windFilterHigh.connect(windGain);
+            windGain.connect(audioCtx.destination);
+
+            audioReady = true;
+        } catch(e) {}
+    }
+
+    // обновляем шум ветра каждый кадр
+    function updateWindSound() {
+        if (!audioReady || !gameRunning) return;
+        if (!isFinite(player.vx)) return;
+        let t = audioCtx.currentTime;
+        let speed = Math.max(0, Math.min(1, player.vx / MAX_VX_GROWTH));
+        // громкость растёт со скоростью
+        windGain.gain.setTargetAtTime(0.04 + speed * 0.13, t, 0.5);
+        // фильтр открывается на высокой скорости — ветер становится "острее"
+        windFilterHigh.frequency.setTargetAtTime(800 + speed * 1400, t, 0.5);
+    }
+
+    // короткий звук термика — нарастающий свист вверх
+    function playThermalSound() {
+        if (!audioReady) return;
+        let t = audioCtx.currentTime;
+        let osc = audioCtx.createOscillator();
+        let gain = audioCtx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(280, t);
+        osc.frequency.exponentialRampToValueAtTime(620, t + 0.35);
+        gain.gain.setValueAtTime(0, t);
+        gain.gain.linearRampToValueAtTime(0.18, t + 0.05);
+        gain.gain.linearRampToValueAtTime(0, t + 0.35);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start(t);
+        osc.stop(t + 0.36);
+    }
+
+    // удар об облако — глухой шлепок (белый шум + фильтр)
+    function playCloudHitSound() {
+        if (!audioReady) return;
+        let t = audioCtx.currentTime;
+        let bufSize = audioCtx.sampleRate * 0.18;
+        let buffer = audioCtx.createBuffer(1, bufSize, audioCtx.sampleRate);
+        let data = buffer.getChannelData(0);
+        for (let i = 0; i < bufSize; i++) data[i] = (Math.random() * 2 - 1);
+        let noise = audioCtx.createBufferSource();
+        noise.buffer = buffer;
+        let filter = audioCtx.createBiquadFilter();
+        filter.type = 'bandpass';
+        filter.frequency.value = 280;
+        filter.Q.value = 0.8;
+        let gain = audioCtx.createGain();
+        gain.gain.setValueAtTime(0.22, t);
+        gain.gain.exponentialRampToValueAtTime(0.001, t + 0.18);
+        noise.connect(filter);
+        filter.connect(gain);
+        gain.connect(audioCtx.destination);
+        noise.start(t);
+        noise.stop(t + 0.19);
+    }
+
+    // смерть — низкий нисходящий тон
+    function playDeathSound() {
+        if (!audioReady) return;
+        let t = audioCtx.currentTime;
+        let osc = audioCtx.createOscillator();
+        let gain = audioCtx.createGain();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(220, t);
+        osc.frequency.exponentialRampToValueAtTime(55, t + 0.6);
+        gain.gain.setValueAtTime(0.18, t);
+        gain.gain.linearRampToValueAtTime(0, t + 0.6);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start(t);
+        osc.stop(t + 0.61);
+    }
+    // =============================================
+
     
     //рекорд
     try {
@@ -300,6 +421,7 @@
         //границы по вертикали
         if (player.y < 32) {
             gameRunning = false;
+            playDeathSound();
             return;
         }
 
@@ -327,6 +449,7 @@
         if (player.y + 12 >= canvas.height - 18) groundCollision = true;
         if (groundCollision) {
             gameRunning = false;
+            playDeathSound();
             return;
         }
         
@@ -339,6 +462,7 @@
                 player.vy -= t.strength * 1.2 * dt;
                 score += 12;
                 addLightnessSpark(t.x, t.y);
+                playThermalSound();
                 thermals.splice(i, 1);
                 i--;
                 continue;
@@ -409,6 +533,7 @@
                 player.vx *= 0.85;
                 score = Math.max(0, score - 15);
                 addCloudPoof(c.x, c.y, c.width);
+                playCloudHitSound();
                 clouds.splice(i, 1);
                 i--;
                 continue;
@@ -445,6 +570,7 @@
             try { localStorage.setItem('sunrise_lightness', highScore); } catch(e) {}
         }
         
+        updateWindSound();
         updateCameraY();
     }
 
@@ -1161,6 +1287,7 @@ outer.addColorStop(0.6, 'rgba(255,180,110,0.1)');
     
     //управление с поддержкой приветственного экрана
     function handlePressStart(e) {
+        initAudio();  // браузер требует жест пользователя для старта аудио
         // если показываем приветственный экран — запускаем игру
         if (showWelcome) {
             startGameFromWelcome();
