@@ -1,3 +1,16 @@
+:root {
+    --bg: #0a0c14;
+    --accent: #ffd9b5;
+
+    --accent-soft: rgba(255, 217, 181, 0.72);
+    --accent-fade: rgba(255, 217, 181, 0.18);
+    --accent-border: rgba(255, 217, 181, 0.08);
+    --glass: rgba(10, 12, 20, 0.48);
+    --glass-strong: rgba(10, 12, 20, 0.72);
+    --shadow:
+        0 10px 30px rgba(0,0,0,0.35);
+    --blur: blur(10px);
+}
 * {
     margin: 0;
     padding: 0;
@@ -9,188 +22,262 @@
 
 html,
 body {
-    margin: 0;
     width: 100%;
     height: 100%;
     overflow: hidden;
-    background: #0a0c14;
+    background:
+        radial-gradient(
+            circle at top,
+            rgba(255,217,181,0.06),
+            transparent 35%
+        ),
+        var(--bg);
+    color: var(--accent);
+    font-family:
+        "Segoe UI",
+        "Inter",
+        "Courier New",
+        monospace;
 }
 
 body {
     display: flex;
     justify-content: center;
     align-items: center;
+    position: relative;
+    isolation: isolate;
 }
+
+body::after {
+    content: "";
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    background:
+        radial-gradient(
+            circle,
+            transparent 45%,
+            rgba(0,0,0,0.28) 100%
+        );
+    z-index: 5;
+}
+
 canvas {
     display: block;
     width: 100vw;
     height: 100vh;
     object-fit: contain;
-    background: #0a0c14;
+    background: var(--bg);
+    image-rendering: auto;
+    box-shadow:
+        0 0 80px rgba(255,217,181,0.04),
+        0 25px 80px rgba(0,0,0,0.55);
+
+    transition:
+        filter 0.3s ease,
+        transform 0.3s ease;
 }
 
-/* интерфейсные элементы — фиксированные, не зависят от масштаба canvas */
-.info {
-    position: fixed;
-    left: 50%;
-    transform: translateX(-50%);
-    bottom: max(18px, env(safe-area-inset-bottom));
-    pointer-events: none;
-    color: #ffd9b5;
-    font-size: 14px;
-    font-weight: 500;
-    letter-spacing: 1px;
-    text-shadow: 0 1px 3px rgba(0,0,0,0.8);
-    background: rgba(10, 12, 20, 0.55);
-    backdrop-filter: blur(6px);
-    -webkit-backdrop-filter: blur(6px);
-    padding: 7px 18px;
-    border-radius: 999px;
-    z-index: 20;
-    border: 1px solid rgba(255,255,255,0.05);
-    white-space: nowrap;
+canvas:active {
+    transform: scale(0.998);
 }
-
+.info,
 .restart-tip {
     position: fixed;
-    top: max(20px, env(safe-area-inset-top));
-    right: max(20px, env(safe-area-inset-right));
-    background: rgba(0, 0, 0, 0.45);
-    backdrop-filter: blur(6px);
-    -webkit-backdrop-filter: blur(6px);
-    padding: 7px 14px;
-    border-radius: 999px;
-    font-size: 12px;
-    font-family: monospace;
-    color: #ffcf9a;
-    pointer-events: none;
     z-index: 20;
-    border: 1px solid rgba(255,255,255,0.04);
+    color: var(--accent);
+    background: var(--glass);
+    border:
+        1px solid var(--accent-border);
+    backdrop-filter: var(--blur);
+    -webkit-backdrop-filter: var(--blur);
+    box-shadow: var(--shadow);
+    text-shadow:
+        0 2px 6px rgba(0,0,0,0.45);
+
+    pointer-events: none;
 }
 
-/* оверлей для поворота экрана */
+.info {
+    left: 50%;
+    bottom: max(18px, env(safe-area-inset-bottom));
+    transform: translateX(-50%);
+    padding: 8px 18px;
+    border-radius: 999px;
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 1.2px;
+    white-space: nowrap;
+    overflow: hidden;
+}
+.info::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background:
+        linear-gradient(
+            120deg,
+            transparent,
+            rgba(255,217,181,0.06),
+            transparent
+        );
+    transform: translateX(-100%);
+    animation: shimmer 7s linear infinite;
+}
+.restart-tip {
+    top: max(20px, env(safe-area-inset-top));
+    right: max(20px, env(safe-area-inset-right));
+    padding: 7px 14px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-family: monospace;
+    letter-spacing: 1px;
+    opacity: 0.82;
+}
+
 .rotate-overlay {
     position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: rgba(10, 12, 20, 0.95);
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
+    inset: 0;
     z-index: 1000;
     display: flex;
     justify-content: center;
     align-items: center;
     flex-direction: column;
-    transition: all 0.3s ease;
+    background:
+        radial-gradient(
+            circle at center,
+            rgba(255,217,181,0.04),
+            transparent 45%
+        ),
+        rgba(10,12,20,0.96);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    animation: fadeIn 0.4s ease;
 }
-
 .rotate-message {
     text-align: center;
-    color: #ffd9b5;
-    font-family: 'Segoe UI', 'Courier New', monospace;
-    animation: fadeIn 0.5s ease;
+    color: var(--accent);
+    animation:
+        float 4s ease-in-out infinite;
 }
-
 .rotate-icon {
-    font-size: 64px;
-    margin-bottom: 20px;
-    animation: rotateHint 2s ease-in-out infinite;
+    font-size: 62px;
+    margin-bottom: 18px;
+    opacity: 0.95;
+    filter:
+        drop-shadow(0 0 14px rgba(255,217,181,0.18));
+    animation:
+        rotateHint 2.4s ease-in-out infinite;
 }
-
 .rotate-text {
     font-size: 24px;
-    font-weight: bold;
+    font-weight: 700;
     letter-spacing: 2px;
-    margin-bottom: 12px;
-    text-shadow: 0 2px 5px rgba(0,0,0,0.5);
+    margin-bottom: 10px;
+    text-transform: uppercase;
 }
-
 .rotate-hint {
-    font-size: 16px;
-    opacity: 0.8;
+    font-size: 15px;
+    opacity: 0.82;
     margin-bottom: 8px;
 }
-
 .rotate-sub {
-    font-size: 12px;
-    opacity: 0.6;
-    letter-spacing: 1px;
+    font-size: 11px;
+    opacity: 0.45;
+    letter-spacing: 2px;
+    text-transform: uppercase;
 }
 
-/* Анимации */
+@keyframes shimmer {
+    from {
+        transform: translateX(-120%);
+    }
+    to {
+        transform: translateX(120%);
+    }
+}
+
 @keyframes fadeIn {
-    from { opacity: 0; }
-    to { opacity: 1; }
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
 }
 
 @keyframes rotateHint {
-    0% { transform: rotate(0deg); }
-    50% { transform: rotate(90deg); }
-    100% { transform: rotate(0deg); }
+    0% {
+        transform: rotate(0deg);
+    }
+    50% {
+        transform: rotate(90deg);
+    }
+    100% {
+        transform: rotate(0deg);
+    }
 }
 
-/* Скрываем оверлей на десктопах и в альбомной ориентации */
+@keyframes float {
+    0%,
+    100% {
+        transform: translateY(0px);
+    }
+    50% {
+        transform: translateY(-6px);
+    }
+}
+
 @media (orientation: landscape) {
     .rotate-overlay {
         display: none !important;
     }
 }
 
-/* Для очень маленьких экранов в портрете */
-@media (max-width: 768px) and (orientation: portrait) {
+@media (max-width: 768px) {
+    .info {
+        font-size: 10px;
+        padding: 6px 14px;
+        max-width: 88%;
+        white-space: normal;
+        text-align: center;
+        line-height: 1.35;
+    }
+    .restart-tip {
+        font-size: 9px;
+        padding: 5px 10px;
+    }
     .rotate-text {
         font-size: 20px;
     }
     .rotate-icon {
-        font-size: 52px;
+        font-size: 54px;
     }
     .rotate-hint {
-        font-size: 14px;
+        font-size: 13px;
     }
 }
 
-/* мобильные экраны */
-@media (max-width: 768px) {
-    .info {
-        font-size: 10px;
-        padding: 5px 12px;
-        bottom: max(12px, env(safe-area-inset-bottom));
-        white-space: normal;
-        text-align: center;
-        max-width: 85%;
-        line-height: 1.3;
-    }
-    .restart-tip {
-        font-size: 9px;
-        padding: 4px 10px;
-        top: max(10px, env(safe-area-inset-top));
-        right: max(10px, env(safe-area-inset-right));
-    }
-}
-
-/* маленькие телефоны */
 @media (max-width: 480px) {
     .info {
         font-size: 9px;
-        padding: 4px 10px;
+        padding: 5px 12px;
     }
     .restart-tip {
         font-size: 8px;
-        padding: 3px 8px;
     }
 }
 
-/* альбомная ориентация на телефонах */
-@media (max-height: 500px) and (orientation: landscape) {
+@media (max-height: 500px)
+and (orientation: landscape) {
+
     .info {
         font-size: 8px;
-        padding: 3px 8px;
-        bottom: max(5px, env(safe-area-inset-bottom));
+        padding: 4px 10px;
+        bottom: 6px;
     }
     .restart-tip {
         font-size: 7px;
-        padding: 2px 6px;
+        padding: 3px 8px;
     }
 }

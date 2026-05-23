@@ -37,8 +37,8 @@
     const DIVE_FORCE = 0.18;
     const LIFT_FORCE = 0.11;
     const MAX_VY = 3.8;
-    const MAX_VX_GROWTH = 7.5;
-    const WIND_BOOST = 0.008; // ускорение от ветра
+    const MAX_VX_GROWTH = 8;
+    const WIND_BOOST = 0.009; // ускорение от ветра
     
     let mountainSegments = [];
     const segmentWidth = 210;
@@ -312,6 +312,20 @@
                 i--;
             }
         }
+
+        function addNegativeSpark(x, y) {
+        for (let i = 0; i < 4; i++) {
+            sparkParticles.push({
+                x: x - cameraX + (Math.random() - 0.5) * 18,
+                y: y - cameraY() + (Math.random() - 0.5) * 18,
+                vx: (Math.random() - 0.5) * 2,
+                vy: (Math.random() - 0.5) * 2 - 0.5,
+                life: 0.7,
+                size: 2 + Math.random() * 3,
+                isNegative: true  // метка для отрисовки
+            });
+        }
+    }
         
         //потоки
         for (let i = 0; i < downdrafts.length; i++) {
@@ -321,6 +335,7 @@
             if (Math.hypot(dx, dy) < d.radius + 9) {
                 player.vy += Math.abs(d.strength) * 0.55;
                 score = Math.max(0, score - 5);
+                addNegativeSpark(d.x, d.y);
                 downdrafts.splice(i, 1);
                 i--;
                 continue;
@@ -674,7 +689,15 @@
         ctx.arc(-4.5, 1, 1, 0, Math.PI * 2);
         ctx.fill();
         ctx.restore();
-        
+
+        // искры от термиков
+        for (let s of sparkParticles) {
+            let color = s.isNegative ? 'rgba(100, 150, 200, ' : 'rgba(255, 220, 140, ';
+            ctx.fillStyle = color + (s.life * 0.9) + ')';
+            ctx.beginPath();
+            ctx.arc(s.x, s.y, s.size * 0.7, 0, Math.PI * 2);
+            ctx.fill();
+        }
 
         //ui
         ctx.font = 'bold 28px "Segoe UI", "Courier New", monospace';
