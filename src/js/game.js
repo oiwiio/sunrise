@@ -735,7 +735,7 @@
     ctx.lineWidth = 1.5;
     ctx.strokeStyle = 'rgba(255,255,220,0.45)';
     ctx.stroke();
-    
+
     //парящие частицы
     for (let i = 0; i < 8; i++) {
         let angle = (i / 8) * Math.PI * 2 + frame * 0.01;
@@ -748,23 +748,72 @@
         ctx.fill();
     }
         
-        //дальние горы (сглаженные)
-        ctx.fillStyle = '#3E2C49';
-        for (let seg of mountainSegments) {
-            let screenX = seg.x - cameraX;
-            let screenYBase = seg.y - camY;
-            if (screenX + segmentWidth > -50 && screenX < canvas.width + 100) {
-                ctx.beginPath();
-                ctx.moveTo(screenX, canvas.height);
-                ctx.lineTo(screenX, screenYBase - 20);
-                ctx.lineTo(screenX + segmentWidth * 0.3, screenYBase - 38);
-                ctx.lineTo(screenX + segmentWidth * 0.55, screenYBase - 28);
-                ctx.lineTo(screenX + segmentWidth * 0.8, screenYBase - 18);
-                ctx.lineTo(screenX + segmentWidth, screenYBase - 14);
-                ctx.lineTo(screenX + segmentWidth, canvas.height);
-                ctx.fill();
-            }
+    //дальние горы
+    ctx.fillStyle = '#3E2C49';
+
+    for (let seg of mountainSegments) {
+        let screenX = seg.x - cameraX;
+        let y = seg.y - camY;
+
+        if (screenX + segmentWidth > -50 && screenX < canvas.width + 100) { 
+            ctx.beginPath();
+            ctx.moveTo(screenX, canvas.height);
+            ctx.lineTo(screenX, y - 20);
+
+            ctx.quadraticCurveTo(
+                screenX + segmentWidth * 0.18,y - 44,
+                screenX + segmentWidth * 0.3,y - 38
+            );
+            ctx.quadraticCurveTo(
+                screenX + segmentWidth * 0.45,y - 18,
+                screenX + segmentWidth * 0.55,y - 28
+            );
+            ctx.quadraticCurveTo(
+                screenX + segmentWidth * 0.72,y - 36,
+                screenX + segmentWidth * 0.8,y - 18
+            );
+            ctx.quadraticCurveTo(
+                screenX + segmentWidth * 0.92,y - 10,
+                screenX + segmentWidth,y - 14
+            );
+            ctx.lineTo(screenX + segmentWidth, canvas.height);
+            ctx.fill();
         }
+        }
+
+
+    //ближние горы
+    ctx.fillStyle = '#1D142B';
+
+    for (let seg of mountainSegments) {
+        let screenX = seg.x - cameraX;
+        let y = seg.y - camY;
+
+        if (screenX + segmentWidth > -50 && screenX < canvas.width + 100) {
+            ctx.beginPath();
+            ctx.moveTo(screenX, canvas.height);
+            ctx.lineTo(screenX, y);
+            ctx.quadraticCurveTo(
+                screenX + segmentWidth * 0.15,y - 20,
+                screenX + segmentWidth * 0.25,y - 14
+            );
+            ctx.quadraticCurveTo(
+                screenX + segmentWidth * 0.38, y - 34,
+                screenX + segmentWidth * 0.45, y - 24
+            );
+            ctx.quadraticCurveTo(
+                screenX + segmentWidth * 0.58,y - 10,
+                screenX + segmentWidth * 0.65,y - 18
+            );
+            ctx.quadraticCurveTo(
+                screenX + segmentWidth * 0.82,y - 20,
+                screenX + segmentWidth,y - 6
+            );
+            ctx.lineTo(screenX + segmentWidth, canvas.height);
+            ctx.fill();
+        }
+    }
+
         // облака
         for (let c of clouds) {
             let x = c.x - cameraX;
