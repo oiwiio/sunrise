@@ -59,6 +59,8 @@
     let windParticles = [];
     let sparkParticles = [];
     let frame = 0;
+    const FRAME_TIME = 1000 / 60;
+    let lastUpdate = 0;
     
     //рекорд
     try {
@@ -137,7 +139,21 @@
         }
     }
 
-    //облака - предпятсивя
+    //облака - препятствия
+    function addCloudPoof(x, y, size) {
+        for (let i = 0; i < 12; i++) {
+            sparkParticles.push({
+                x: x - cameraX + (Math.random() - 0.5) * size,
+                y: y - getCameraY() + (Math.random() - 0.5) * size * 0.6,
+                vx: (Math.random() - 0.5) * 2.5,
+                vy: (Math.random() - 0.5) * 2 - 1,
+                life: 0.8,
+                size: 3 + Math.random() * 6,
+                isCloud: true
+            });
+        }
+    }
+
     function addCloudIfNeeded() {
         if (clouds.length >= 4) return;
         if (Math.random() * 300 < 5) return;
@@ -150,51 +166,6 @@
             speedY: (Math.random() - 0.5) * 0.3,
             opacity: 0.7 + Math.random() * 0.3
         });
-    }
-
-        // облака (движение и столкновение)
-        for (let i = 0; i < clouds.length; i++) {
-            let c = clouds[i];
-            c.x -= player.vx * 0.6;   // движутся медленнее, чем горы (параллакс)
-            c.y += c.speedY;
-            
-            // проверка столкновения с игроком
-            let dx = player.x - c.x;
-            let dy = player.y - c.y;
-            let collisionDist = (c.width / 2) + 10;
-            if (Math.abs(dx) < collisionDist && Math.abs(dy) < (c.height / 2) + 8) {
-                // замедление
-                player.vx *= 0.85;
-                score = Math.max(0, score - 15);
-                // визуальный эффект — облако "взрывается"
-                addCloudPoof(c.x, c.y, c.width);
-                clouds.splice(i, 1);
-                i--;
-                continue;
-            }
-            
-            // удаляем, если ушло за левый край
-            if (c.x + c.width < cameraX - 100) {
-                clouds.splice(i, 1);
-                i--;
-            }
-        }
-        
-        // генерация новых облаков
-        addCloudIfNeeded();
-
-        function addCloudPoof(x, y, size) {
-        for (let i = 0; i < 12; i++) {
-            sparkParticles.push({
-                x: x - cameraX + (Math.random() - 0.5) * size,
-                y: y - cameraY() + (Math.random() - 0.5) * size * 0.6,
-                vx: (Math.random() - 0.5) * 2.5,
-                vy: (Math.random() - 0.5) * 2 - 1,
-                life: 0.8,
-                size: 3 + Math.random() * 6,
-                isCloud: true
-            });
-        }
     }
     
     
@@ -244,7 +215,7 @@
         for (let i = 0; i < 6; i++) {
             sparkParticles.push({
                 x: x - cameraX + (Math.random() - 0.5) * 18,
-                y: y - cameraY() + (Math.random() - 0.5) * 18,
+                y: y - getCameraY() + (Math.random() - 0.5) * 18,
                 vx: (Math.random() - 0.5) * 2.2,
                 vy: (Math.random() - 0.5) * 2 - 1,
                 life: 0.9,
@@ -286,36 +257,41 @@
     
     //Y камеры (камера следует за Y игрока)
     let cameraYOffset = 0;
-    function cameraY() {
-        // плавное следование камеры за игроком по вертикали
+    function updateCameraY() {
         let targetCamY = player.y - canvas.height / 2;
         cameraYOffset += (targetCamY - cameraYOffset) * 0.05;
+    }
+    function getCameraY() {
         return cameraYOffset;
     }
     
+
     //обновление
-    function updateGame() {
+    function updateGame(delta) {
         if (!gameRunning) return;
+        
+        // нормализуем delta (чтобы при 60 FPS всё работало как раньше)
+        let dt = Math.min(1.5, delta * 60);
         
         //управление по вертикали
         if (isPressing) {
             //пикирование
-            player.vy += 0.32;
-            player.angle = Math.min(0.65, player.angle + 0.04); 
+            player.vy += 0.32 * dt;
+            player.angle = Math.min(0.65, player.angle + 0.04 * dt); 
         } else {
-            player.vy -= 0.13;
-            player.angle = Math.max(-0.45, player.angle - 0.03); 
+            player.vy -= 0.13 * dt;
+            player.angle = Math.max(-0.45, player.angle - 0.03 * dt); 
         }
         
-        player.vy += GRAVITY;
+        player.vy += GRAVITY * dt;
         if (player.vy > MAX_VY) player.vy = MAX_VY;
         if (player.vy < -4.6) player.vy = -4.6;
-        player.y += player.vy;
+        player.y += player.vy * dt;
         
         //горизонтальное движение
-        player.vx += WIND_BOOST;
+        player.vx += WIND_BOOST * dt;
         if (player.vx > MAX_VX_GROWTH) player.vx = MAX_VX_GROWTH;
-        player.x += player.vx;
+        player.x += player.vx * dt;
         
         //камера за игроком
         cameraX = player.x - canvas.width * 0.35;
@@ -327,22 +303,16 @@
             return;
         }
 
-        // добавление точки следа (абсолютные координаты в мире)
+        // след
         let dist = Math.hypot(player.x - lastTrailX, player.y - lastTrailY);
-        if (dist > 12) {  // интервал ~12 пикселей
-            trailPoints.push({
-                x: player.x,        
-                y: player.y,        
-                life: 1.0
-            });
+        if (dist > 12 * dt) {
+            trailPoints.push({ x: player.x, y: player.y, life: 1.0 });
             lastTrailX = player.x;
             lastTrailY = player.y;
         }
-        
-        // ограничиваем количество точек (не больше 35)
         while (trailPoints.length > 35) trailPoints.shift();
         
-        //столкновение с горами
+        // столкновение с горами
         let groundCollision = false;
         for (let seg of mountainSegments) {
             let worldX = seg.x;
@@ -360,13 +330,13 @@
             return;
         }
         
-        //термики
+        // термики
         for (let i = 0; i < thermals.length; i++) {
             let t = thermals[i];
             let dx = player.x - t.x;
             let dy = player.y - t.y;
             if (Math.hypot(dx, dy) < t.radius + 9) {
-                player.vy -= t.strength * 1.2;
+                player.vy -= t.strength * 1.2 * dt;
                 score += 12;
                 addLightnessSpark(t.x, t.y);
                 thermals.splice(i, 1);
@@ -383,7 +353,7 @@
         for (let i = 0; i < 4; i++) {
             sparkParticles.push({
                 x: x - cameraX + (Math.random() - 0.5) * 18,
-                y: y - cameraY() + (Math.random() - 0.5) * 18,
+                y: y - getCameraY() + (Math.random() - 0.5) * 18,
                 vx: (Math.random() - 0.5) * 2,
                 vy: (Math.random() - 0.5) * 2 - 0.5,
                 life: 0.7,
@@ -426,13 +396,12 @@
             initMountains();
         }
 
-        // облака (движение и столкновение)
+        // облака
         for (let i = 0; i < clouds.length; i++) {
             let c = clouds[i];
-            c.x -= player.vx * 0.55;   // параллакс
-            c.y += c.speedY;
+            c.x -= player.vx * 0.55 * dt;
+            c.y += c.speedY * dt;
             
-            // столкновение с игроком
             let dx = player.x - c.x;
             let dy = player.y - c.y;
             let collisionDist = (c.width / 2) + 12;
@@ -452,34 +421,33 @@
         }
         addCloudIfNeeded();
         
-        //счет ( с 1.0.7 с бонусом за скорость )
+        // счёт
         let isMaxSpeed = (player.vx > MAX_VX_GROWTH - 0.8);
-        
         if (isMaxSpeed) {
-            // базовые очки за полёт
-            score += 0.5;
-            
-            // бонус за скорость
-            let speedBonus = Math.floor(player.vx * 0.3);
+            score += 0.5 * dt;
+            let speedBonus = Math.floor(player.vx * 0.3 * dt);
             score += Math.min(2, speedBonus);
         }
         
         //плавный возврат угла
-        player.angle *= 0.98;
+       player.angle *= Math.pow(0.98, dt);
         
         //частицы
         addWindParticle();
         updateParticles();
         
         //рекорд
-         if (Math.floor(score) > highScore) {
+        if (Math.floor(score) > highScore) {
             highScore = Math.floor(score);
-            highScorePosition = player.x;  // уже есть
-            highScorePositionY = player.y; // ← ДОБАВИТЬ ЭТУ СТРОКУ
+            highScorePosition = player.x;
+            highScorePositionY = player.y;
             showFlag = true;
             try { localStorage.setItem('sunrise_lightness', highScore); } catch(e) {}
         }
+        
+        updateCameraY();
     }
+
     
     // привественный экран
     function drawWelcomeScreen() {
@@ -618,7 +586,7 @@
             return;
         }
         
-        const camY = cameraY();
+        const camY = getCameraY();
         
         //небо
         let grad = ctx.createLinearGradient(0, 0, 0, canvas.height);
@@ -821,8 +789,12 @@ outer.addColorStop(0.6, 'rgba(255,180,110,0.1)');
             let w = c.width;
             let h = c.height;
             
+            if (!isFinite(x) || !isFinite(y) || !w || !h) continue;
             // лёгкая дымка вокруг облака
             let glow = ctx.createRadialGradient(x, y, h * 0.2, x, y, w * 0.9);
+
+                
+
             glow.addColorStop(0, 'rgba(255, 240, 220, 0.08)');
             glow.addColorStop(1, 'rgba(255, 240, 220, 0)');
             ctx.fillStyle = glow;
@@ -881,14 +853,23 @@ outer.addColorStop(0.6, 'rgba(255,180,110,0.1)');
             ctx.fill();
         }
         
-        //турбулентность
-        for (let d of downdrafts) {
-            let screenX = d.x - cameraX;
-            let screenY = d.y - camY;
-            ctx.beginPath();
-            ctx.arc(screenX, screenY, d.radius - 5, 0, Math.PI * 2);
-            ctx.fillStyle = `rgba(90, 110, 150, 0.24)`;
-            ctx.fill();
+        // турбулентность
+        for (let i = 0; i < downdrafts.length; i++) {
+            let d = downdrafts[i];
+            let dx = player.x - d.x;
+            let dy = player.y - d.y;
+            if (Math.hypot(dx, dy) < d.radius + 9) {
+                player.vy += Math.abs(d.strength) * 0.55 * dt;
+                score = Math.max(0, score - 5);
+                addNegativeSpark(d.x, d.y);
+                downdrafts.splice(i, 1);
+                i--;
+                continue;
+            }
+            if (d.x < cameraX - 200) {
+                downdrafts.splice(i, 1);
+                i--;
+            }
         }
         
         //отрисовка флага рекорда
@@ -1232,10 +1213,14 @@ outer.addColorStop(0.6, 'rgba(255,180,110,0.1)');
     initMountains();
     bindControls();
     
-    function animate() {
-        if (gameRunning && !showWelcome) updateGame();
-        draw();
+    function animate(timestamp) {
         requestAnimationFrame(animate);
+        if (timestamp - lastUpdate >= FRAME_TIME) {
+            let delta = Math.min(0.05, (timestamp - lastUpdate) / 1000);
+            lastUpdate = timestamp;
+            if (gameRunning && !showWelcome) updateGame(delta);
+        }
+        draw();
     }
-    animate();
+    requestAnimationFrame(animate);
 })();
