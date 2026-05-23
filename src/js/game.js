@@ -643,34 +643,110 @@
             ctx.fillText('ПРЕДЕЛ ВЫСОТЫ', canvas.width - 160, 24 - camY);
         }
         
-        //солнце
+    //солнце
+    let sunX = canvas.width - 90;
+    let sunY = 78;
+
+    let pulse = 0.95 + Math.sin(frame * 0.03) * 0.05;
+    let rayRotation = frame * 0.01;
+    let rayRotation2 = -frame * 0.006;
+
+    //атмосферное свечение
+    let atmosphere = ctx.createRadialGradient(sunX, sunY, 20, sunX, sunY, 180);
+    atmosphere.addColorStop(0, 'rgba(255,220,150,0.14)');
+    atmosphere.addColorStop(0.5, 'rgba(255,170,90,0.07)');
+    atmosphere.addColorStop(1, 'rgba(255,120,50,0)');
+    ctx.fillStyle = atmosphere;
+    ctx.beginPath();
+    ctx.arc(sunX, sunY, 180, 0, Math.PI * 2);
+    ctx.fill();
+
+    //лучи
+    ctx.save();
+    ctx.translate(sunX, sunY);
+    ctx.rotate(rayRotation);
+    for (let i = 0; i < 10; i++) {
+        let angle = (i / 10) * Math.PI * 2;
+        ctx.save();
+        ctx.rotate(angle);
+        let len = 95 + Math.sin(frame * 0.04 + i) * 12;
         ctx.beginPath();
-        ctx.arc(canvas.width - 70, 65, 42, 0, Math.PI * 2);
-        ctx.fillStyle = '#FFD89C';
+        ctx.moveTo(30, 0);
+        ctx.lineTo(len, -5);
+        ctx.lineTo(len, 5);
+        ctx.fillStyle = `rgba(255,220,150,${0.18 + Math.sin(frame * 0.02 + i) * 0.08})`;
         ctx.fill();
+        ctx.restore();
+    }
+    ctx.restore();
+
+    //лучи
+    ctx.save(); 
+    ctx.translate(sunX, sunY);
+    ctx.rotate(rayRotation2);
+    for (let i = 0; i < 6; i++) {
+        let angle = (i / 6) * Math.PI * 2;
+        ctx.save();
+        ctx.rotate(angle);
+        let len = 65 + Math.sin(frame * 0.05 + i) * 8;
         ctx.beginPath();
-        ctx.arc(canvas.width - 70, 65, 34, 0, Math.PI * 2);
-        ctx.fillStyle = '#FFF1C1';
+        ctx.moveTo(22, 0);
+        ctx.lineTo(len, -3);
+        ctx.lineTo(len, 3);
+        ctx.fillStyle = `rgba(255,245,200,${0.22 + Math.sin(frame * 0.03 + i) * 0.05})`;
+        ctx.fill();
+        ctx.restore();
+    }
+        ctx.restore();
+
+    //внешний ореол
+    let outer = ctx.createRadialGradient(sunX, sunY, 10, sunX, sunY, 85);
+    outer.addColorStop(0, 'rgba(255,235,180,0.55)');
+    outer.addColorStop(0.6, 'rgba(255,180,110,0.18)');
+    outer.addColorStop(1, 'rgba(255,140,80,0)');
+    ctx.fillStyle = outer;
+    ctx.beginPath();
+    ctx.arc(sunX, sunY, 85 * pulse, 0, Math.PI * 2);
+    ctx.fill();
+    
+    //ядро солнца
+    let core = ctx.createRadialGradient(sunX - 5, sunY - 5, 0, sunX, sunY, 38);
+    core.addColorStop(0, '#fffef4');
+    core.addColorStop(0.25, '#ffe9b5');
+    core.addColorStop(0.7, '#ffc56d');
+    core.addColorStop(1, '#ff9738');
+    ctx.fillStyle = core;
+    ctx.beginPath();
+    ctx.arc(sunX, sunY, 34 * pulse, 0, Math.PI * 2);
         ctx.fill();
 
-        //ближние горы (сглаженные)
-        ctx.fillStyle = '#1D142B';
-        for (let seg of mountainSegments) {
-            let screenX = seg.x - cameraX;
-            let screenYBase = seg.y - camY;
-            if (screenX + segmentWidth > -50 && screenX < canvas.width + 100) {
-                ctx.beginPath();
-                ctx.moveTo(screenX, canvas.height);
-                ctx.lineTo(screenX, screenYBase);
-                ctx.lineTo(screenX + segmentWidth * 0.25, screenYBase - 14);
-                ctx.lineTo(screenX + segmentWidth * 0.45, screenYBase - 24);
-                ctx.lineTo(screenX + segmentWidth * 0.65, screenYBase - 18);
-                ctx.lineTo(screenX + segmentWidth * 0.85, screenYBase - 10);
-                ctx.lineTo(screenX + segmentWidth, screenYBase - 6);
-                ctx.lineTo(screenX + segmentWidth, canvas.height);
-                ctx.fill();
-            }
-        }
+    //центральная яркая точка
+    ctx.beginPath();
+    ctx.arc(sunX, sunY, 7, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(255,255,245,0.95)';
+    ctx.fill();
+
+    //крест-блик
+    ctx.beginPath();
+    ctx.moveTo(sunX - 18, sunY);
+    ctx.lineTo(sunX + 18, sunY);
+    ctx.moveTo(sunX, sunY - 18);
+    ctx.lineTo(sunX, sunY + 18);
+    ctx.lineWidth = 1.5;
+    ctx.strokeStyle = 'rgba(255,255,220,0.45)';
+    ctx.stroke();
+    
+    //парящие частицы
+    for (let i = 0; i < 8; i++) {
+        let angle = (i / 8) * Math.PI * 2 + frame * 0.01;
+        let radius = 48 + Math.sin(frame * 0.03 + i) * 8;
+        let px = sunX + Math.cos(angle) * radius;
+        let py = sunY + Math.sin(angle) * radius;
+        ctx.beginPath();
+        ctx.arc(px, py, 1.8 + Math.sin(frame * 0.04 + i) * 0.4, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(255,230,160,${0.35 + Math.sin(frame * 0.05 + i) * 0.15})`;
+        ctx.fill();
+    }
         
         //дальние горы (сглаженные)
         ctx.fillStyle = '#3E2C49';
@@ -906,6 +982,44 @@
                 }
             }
         }
+
+        // эффект рассвета (линзовые блики + дымка)
+        // теплая дымка поверх неба (мягкий градиент)
+        let hazeGrad = ctx.createLinearGradient(0, 0, 0, canvas.height);
+        hazeGrad.addColorStop(0, 'rgba(255, 220, 150, 0.12)');
+        hazeGrad.addColorStop(0.5, 'rgba(255, 180, 100, 0.05)');
+        hazeGrad.addColorStop(1, 'rgba(255, 140, 80, 0)');
+        ctx.fillStyle = hazeGrad;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        
+        // линзовый блик
+        let flareX = canvas.width - 80;
+        let flareY = 60;        
+        
+        // основной блик (яркое пятно)
+        let mainFlare = ctx.createRadialGradient(flareX, flareY, 5, flareX, flareY, 45);
+        mainFlare.addColorStop(0, 'rgba(255, 240, 200, 0.25)');
+        mainFlare.addColorStop(0.6, 'rgba(255, 200, 100, 0.1)');
+        mainFlare.addColorStop(1, 'rgba(255, 160, 80, 0)');
+        ctx.fillStyle = mainFlare;
+        ctx.beginPath();
+        ctx.arc(flareX, flareY, 60, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // маленький яркий центр
+        ctx.fillStyle = 'rgba(255, 255, 220, 0.2)';
+        ctx.beginPath();
+        ctx.arc(flareX, flareY, 18, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // горизонтальный блик
+        ctx.fillStyle = 'rgba(255, 200, 120, 0.06)';
+        for (let i = 0; i < 3; i++) {
+            ctx.beginPath();
+            ctx.ellipse(flareX + (i - 1) * 35, flareY + 12, 20, 6, 0, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
     }
 
 
