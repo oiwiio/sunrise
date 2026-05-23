@@ -12,6 +12,11 @@
     let highScorePosition = 0; 
     let showFlag = false;          
     
+    // след от параплана
+    let trailPoints = [];   // точки для линии следа
+    let lastTrailX = 0;     // для проверки, когда добавлять новую точку
+    let lastTrailY = 0;
+
     //привественный экран
     let showWelcome = true;  // показываем только при первой загрузке
     
@@ -56,7 +61,7 @@
         if (saved && !isNaN(parseInt(saved))) highScore = parseInt(saved);
     } catch(e) {}
     
-    // ---------- ФУНКЦИЯ ЗАПУСКА ИГРЫ С ПРИВЕТСТВЕННОГО ЭКРАНА ----------
+    // запуск игры с экрана привествия
     function startGameFromWelcome() {
         showWelcome = false;
         gameRunning = true;
@@ -127,23 +132,48 @@
         }
     }
     
-    //частицы ветра (полноэкранные)
-    function addWindParticle() {
-        let intensity = Math.min(1.2, player.vx / 9);
-        // частота появления зависит от скорости ветра
-        if (Math.random() > 0.3 + intensity * 0.2) return;
+    // обычные частицы ветра (слабая турбулентность)
+    function addWindParticleNormal() {
+        let intensity = Math.min(0.8, player.vx / 12);
+        if (Math.random() > 0.2 + intensity * 0.15) return;
         
         windParticles.push({
-            x: canvas.width + 20 + Math.random() * 100,  // за правым краем
-            y: Math.random() * canvas.height,            // случайная высота по всему экрану
-            size: 2 + Math.random() * 6,
-            life: 0.8 + Math.random() * 0.5,
-            vx: -(3 + Math.random() * 8 + player.vx * 0.8),
-            vy: (Math.random() - 0.5) * 1.5,
-            opacity: 0.3 + Math.random() * 0.5
+            x: canvas.width + 10 + Math.random() * 80,
+            y: Math.random() * canvas.height,
+            length: 12 + Math.random() * 20,
+            width: 0.8 + Math.random() * 1.2,
+            life: 0.6 + Math.random() * 0.5,
+            vx: -(2 + Math.random() * 6 + player.vx * 0.4),
+            vy: (Math.random() - 0.5) * 0.6,
+            opacity: 0.15 + Math.random() * 0.25
         });
     }
-    
+
+    // линии ветра (только на максимальной скорости)
+    function addWindParticleMaxSpeed() {
+        let isMaxSpeed = (player.vx > MAX_VX_GROWTH - 0.8);
+        if (!isMaxSpeed) return;
+        
+        if (Math.random() > 0.12) return;
+        
+        windParticles.push({
+            x: canvas.width + 40 + Math.random() * 120,
+            y: Math.random() * canvas.height,
+            length: 35 + Math.random() * 50,
+            width: 1.8 + Math.random() * 2.5,
+            life: 0.9 + Math.random() * 0.6,
+            vx: -(5 + Math.random() * 12 + player.vx * 0.9),
+            vy: (Math.random() - 0.5) * 0.9,
+            opacity: 0.4 + Math.random() * 0.4
+        });
+    }
+
+    // общий вызов частиц ветра
+    function addWindParticle() {
+        addWindParticleNormal();      // всегда (но редко)
+        addWindParticleMaxSpeed();    // только на макс. скорости
+    }
+
     function addLightnessSpark(x, y) {
         for (let i = 0; i < 6; i++) {
             sparkParticles.push({
@@ -162,7 +192,7 @@
             let p = windParticles[i];
             p.x += p.vx;
             p.y += p.vy;
-            p.life -= 0.008;  // медленнее исчезают
+            p.life -= 0.008;
             if (p.x < -100 || p.life <= 0) {
                 windParticles.splice(i, 1);
                 i--;
@@ -176,6 +206,13 @@
             s.life -= 0.025;
             if (s.life <= 0 || s.y > canvas.height + 50) {
                 sparkParticles.splice(i, 1);
+                i--;
+            }
+        }
+        for (let i = 0; i < trailPoints.length; i++) {
+            trailPoints[i].life -= 0.025;
+            if (trailPoints[i].life <= 0) {
+                trailPoints.splice(i, 1);
                 i--;
             }
         }
@@ -224,6 +261,21 @@
             gameRunning = false;
             return;
         }
+
+        // добавление точки следа (абсолютные координаты в мире)
+        let dist = Math.hypot(player.x - lastTrailX, player.y - lastTrailY);
+        if (dist > 12) {  // интервал ~12 пикселей
+            trailPoints.push({
+                x: player.x,        
+                y: player.y,        
+                life: 1.0
+            });
+            lastTrailX = player.x;
+            lastTrailY = player.y;
+        }
+        
+        // ограничиваем количество точек (не больше 35)
+        while (trailPoints.length > 35) trailPoints.shift();
         
         //столкновение с горами
         let groundCollision = false;
@@ -294,9 +346,17 @@
             initMountains();
         }
         
-        //счет
-        let speedBonus = Math.floor(player.vx * 0.25);
-        score += 0.2 + Math.min(1.5, speedBonus);
+        //счет ( с 1.0.7 с бонусом за скорость )
+        let isMaxSpeed = (player.vx > MAX_VX_GROWTH - 0.8);
+        
+        if (isMaxSpeed) {
+            // базовые очки за полёт
+            score += 0.5;
+            
+            // бонус за скорость
+            let speedBonus = Math.floor(player.vx * 0.3);
+            score += Math.min(2, speedBonus);
+        }
         
         //плавный возврат угла
         player.angle *= 0.97;
@@ -391,7 +451,7 @@
         }
     }
 
-        //флажек рекорда
+    //флажек рекорда
     function drawRecordFlag(currentX, camY) {
         if (!showFlag) return;
         
@@ -542,6 +602,53 @@
         //отрисовка флага рекорда
         drawRecordFlag(player.x, camY);
 
+
+        // индикатор максимальной скорости
+        let isMaxSpeed = (player.vx > MAX_VX_GROWTH - 0.8);
+        if (isMaxSpeed) {
+            ctx.font = 'bold 11px monospace';
+            ctx.fillStyle = '#FFD966';
+            ctx.fillText(' MAX SPEED ', canvas.width - 130, 58);
+        }
+
+        // тонкий след от параплана (конденсация)
+        if (trailPoints.length > 1) {
+            ctx.beginPath();
+            ctx.lineWidth = 1.2;
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+            
+            for (let i = 0; i < trailPoints.length - 1; i++) {
+                let p1 = trailPoints[i];
+                let p2 = trailPoints[i + 1];
+                
+                // преобразуем абсолютные координаты в экранные
+                let screenX1 = p1.x - cameraX;
+                let screenY1 = p1.y - camY;
+                let screenX2 = p2.x - cameraX;
+                let screenY2 = p2.y - camY;
+                
+                // плавное исчезновение
+                let opacity = p1.life * 0.4;
+                
+                ctx.beginPath();
+                ctx.moveTo(screenX1, screenY1);
+                ctx.lineTo(screenX2, screenY2);
+                ctx.strokeStyle = `rgba(255, 255, 240, ${opacity})`;
+                ctx.stroke();
+            }
+        }
+
+        // линии ветра
+        for (let p of windParticles) {
+            ctx.beginPath();
+            ctx.moveTo(p.x, p.y);
+            ctx.lineTo(p.x - p.length, p.y - p.vy * 2);
+            ctx.lineWidth = p.width;
+            ctx.strokeStyle = `rgba(255, 255, 210, ${p.life * p.opacity * 0.6})`;
+            ctx.stroke();
+        }
+
         //игрок
         ctx.save();
         ctx.translate(player.x - cameraX, player.y - camY);
@@ -569,21 +676,7 @@
         ctx.fill();
         ctx.restore();
         
-        //частицы
-         for (let p of windParticles) {
-            ctx.fillStyle = `rgba(255, 255, 210, ${p.life * p.opacity * 0.5})`;
-            ctx.beginPath();
-            // вытянутые капли/линии ветра
-            ctx.ellipse(p.x, p.y, p.size * 0.8, p.size * 0.3, 0, 0, Math.PI * 2);
-            ctx.fill();
-        }
-        for (let s of sparkParticles) {
-            ctx.fillStyle = `rgba(255, 220, 140, ${s.life * 0.9})`;
-            ctx.beginPath();
-            ctx.arc(s.x, s.y, s.size * 0.7, 0, Math.PI * 2);
-            ctx.fill();
-        }
-        
+
         //ui
         ctx.font = 'bold 28px "Segoe UI", "Courier New", monospace';
         ctx.fillStyle = '#FFF9E8';
@@ -616,7 +709,8 @@
         
         frame++;
     }
-    
+
+
     //управление
     function restartGame() {
         gameRunning = true;
