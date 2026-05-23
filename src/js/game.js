@@ -10,7 +10,11 @@
     let highScore = 0;
 
     let highScorePosition = 0; 
-    let showFlag = false;          
+    let showFlag = false;        
+    
+    // облака - препядствия 
+    let clouds = []; 
+    const CLOUD_MAX = 6;  
     
     // след от параплана
     let trailPoints = [];   // точки для линии следа
@@ -84,7 +88,7 @@
             lastHeight = newHeight;
         }
     }
-    
+
     function extendWorld() {
         if (mountainSegments.length === 0) {
             initMountains();
@@ -105,7 +109,7 @@
             mountainSegments.shift();
         }
     }
-    
+
     //термики
     function addThermalIfNeeded() {
         if (thermals.length >= THERMAL_MAX) return;
@@ -131,6 +135,68 @@
             });
         }
     }
+
+    //облака - предпятсивя
+        function addCloudIfNeeded() {
+            if (clouds.length >= CLOUD_MAX) return;
+            if (Math.random() * 200 < 8) {  // ~4% шанс каждый кадр
+                clouds.push({
+                    x: cameraX + canvas.width + 50 + Math.random() * 200,
+                    y: 80 + Math.random() * (canvas.height - 150),
+                    width: 45 + Math.random() * 35,
+                    height: 25 + Math.random() * 20,
+                    speedY: (Math.random() - 0.5) * 0.4,
+                    life: 1.0,         // для эффекта при столкновении
+                    opacity: 0.7 + Math.random() * 0.3
+            });
+        }
+    }
+
+        // облака (движение и столкновение)
+        for (let i = 0; i < clouds.length; i++) {
+            let c = clouds[i];
+            c.x -= player.vx * 0.6;   // движутся медленнее, чем горы (параллакс)
+            c.y += c.speedY;
+            
+            // проверка столкновения с игроком
+            let dx = player.x - c.x;
+            let dy = player.y - c.y;
+            let collisionDist = (c.width / 2) + 10;
+            if (Math.abs(dx) < collisionDist && Math.abs(dy) < (c.height / 2) + 8) {
+                // замедление
+                player.vx *= 0.85;
+                score = Math.max(0, score - 15);
+                // визуальный эффект — облако "взрывается"
+                addCloudPoof(c.x, c.y, c.width);
+                clouds.splice(i, 1);
+                i--;
+                continue;
+            }
+            
+            // удаляем, если ушло за левый край
+            if (c.x + c.width < cameraX - 100) {
+                clouds.splice(i, 1);
+                i--;
+            }
+        }
+        
+        // генерация новых облаков
+        addCloudIfNeeded();
+
+        function addCloudPoof(x, y, size) {
+        for (let i = 0; i < 12; i++) {
+            sparkParticles.push({
+                x: x - cameraX + (Math.random() - 0.5) * size,
+                y: y - cameraY() + (Math.random() - 0.5) * size * 0.6,
+                vx: (Math.random() - 0.5) * 2.5,
+                vy: (Math.random() - 0.5) * 2 - 1,
+                life: 0.8,
+                size: 3 + Math.random() * 6,
+                isCloud: true
+            });
+        }
+    }
+    
     
     // обычные частицы ветра (слабая турбулентность)
     function addWindParticleNormal() {
@@ -359,6 +425,32 @@
         } else {
             initMountains();
         }
+
+        // облака (движение и столкновение)
+        for (let i = 0; i < clouds.length; i++) {
+            let c = clouds[i];
+            c.x -= player.vx * 0.55;   // параллакс
+            c.y += c.speedY;
+            
+            // столкновение с игроком
+            let dx = player.x - c.x;
+            let dy = player.y - c.y;
+            let collisionDist = (c.width / 2) + 12;
+            if (Math.abs(dx) < collisionDist && Math.abs(dy) < (c.height / 2) + 10) {
+                player.vx *= 0.85;
+                score = Math.max(0, score - 15);
+                addCloudPoof(c.x, c.y, c.width);
+                clouds.splice(i, 1);
+                i--;
+                continue;
+            }
+            
+            if (c.x + c.width < cameraX - 100) {
+                clouds.splice(i, 1);
+                i--;
+            }
+        }
+        addCloudIfNeeded();
         
         //счет ( с 1.0.7 с бонусом за скорость )
         let isMaxSpeed = (player.vx > MAX_VX_GROWTH - 0.8);
@@ -591,7 +683,63 @@
                 ctx.fill();
             }
         }
-        
+
+        // облака
+        for (let c of clouds) {
+            let x = c.x - cameraX;
+            let y = c.y - camY;
+            let w = c.width;
+            let h = c.height;
+            
+            // лёгкая дымка вокруг облака
+            let glow = ctx.createRadialGradient(x, y, h * 0.2, x, y, w * 0.9);
+            glow.addColorStop(0, 'rgba(255, 240, 220, 0.08)');
+            glow.addColorStop(1, 'rgba(255, 240, 220, 0)');
+            ctx.fillStyle = glow;
+            ctx.beginPath();
+            ctx.ellipse(x, y, w, h * 0.9, 0, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // силуэт нижних "пухов" (тень)
+            ctx.fillStyle = 'rgba(180, 190, 210, 0.16)';
+            ctx.beginPath();
+            ctx.arc(x - w * 0.38, y + 8, h * 0.42, 0, Math.PI * 2);
+            ctx.arc(x + w * 0.3, y + 10, h * 0.4, 0, Math.PI * 2);
+            ctx.arc(x, y + 4, h * 0.52, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // основное тело облака (градиент)
+            let body = ctx.createLinearGradient(x, y - h, x, y + h);
+            body.addColorStop(0, 'rgba(255, 255, 255, 0.92)');
+            body.addColorStop(1, 'rgba(230, 235, 245, 0.72)');
+            ctx.fillStyle = body;
+            ctx.beginPath();
+            ctx.arc(x - w * 0.42, y, h * 0.46, 0, Math.PI * 2);
+            ctx.arc(x - w * 0.1, y - h * 0.18, h * 0.56, 0, Math.PI * 2); 
+            ctx.arc(x + w * 0.22, y - h * 0.08, h * 0.5, 0, Math.PI * 2);
+            ctx.arc(x + w * 0.45, y + h * 0.04, h * 0.38, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // рассветная подсветка сверху
+            let highlight = ctx.createLinearGradient(x, y - h, x, y);
+            highlight.addColorStop(0, 'rgba(255, 220, 170, 0.28)');
+            highlight.addColorStop(1, 'rgba(255, 220, 170, 0)');
+            ctx.fillStyle = highlight;
+            ctx.beginPath();
+            ctx.arc(x - w * 0.15, y - h * 0.2, h * 0.28, 0, Math.PI * 2);
+            ctx.arc(x + w * 0.15, y - h * 0.16, h * 0.24, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // лёгкая обводка (воздушность)
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+            ctx.lineWidth = 1.5;
+            ctx.beginPath();
+            ctx.arc(x - w * 0.42, y, h * 0.46, 0, Math.PI * 2);
+            ctx.arc(x - w * 0.1, y - h * 0.18, h * 0.56, 0, Math.PI * 2);
+            ctx.arc(x + w * 0.22, y - h * 0.08, h * 0.5, 0, Math.PI * 2);
+            ctx.stroke();
+        }
+
         //термики
         for (let t of thermals) {
             let screenX = t.x - cameraX;
@@ -690,10 +838,17 @@
         ctx.fill();
         ctx.restore();
 
-        // искры от термиков
+        // искры (жёлтые, синие, облачные)
         for (let s of sparkParticles) {
-            let color = s.isNegative ? 'rgba(100, 150, 200, ' : 'rgba(255, 220, 140, ';
-            ctx.fillStyle = color + (s.life * 0.9) + ')';
+            let color;
+            if (s.isCloud) {
+                color = `rgba(240, 248, 255, ${s.life * 0.8})`;
+            } else if (s.isNegative) {
+                color = `rgba(100, 150, 200, ${s.life * 0.9})`;
+            } else {
+                color = `rgba(255, 220, 140, ${s.life * 0.9})`;
+            }
+            ctx.fillStyle = color;
             ctx.beginPath();
             ctx.arc(s.x, s.y, s.size * 0.7, 0, Math.PI * 2);
             ctx.fill();
