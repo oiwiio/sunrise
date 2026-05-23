@@ -233,13 +233,12 @@
         
         //управление по вертикали
         if (isPressing) {
-            // пикирование
+            //пикирование
             player.vy += 0.32;
-            player.angle = Math.min(0.42, player.angle + 0.025);
+            player.angle = Math.min(0.65, player.angle + 0.04); 
         } else {
-            // плавный подъем
             player.vy -= 0.13;
-            player.angle = Math.max(-0.28, player.angle - 0.018);
+            player.angle = Math.max(-0.45, player.angle - 0.03); 
         }
         
         player.vy += GRAVITY;
@@ -359,7 +358,7 @@
         }
         
         //плавный возврат угла
-        player.angle *= 0.97;
+        player.angle *= 0.98;
         
         //частицы
         addWindParticle();
