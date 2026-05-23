@@ -651,10 +651,10 @@
     let rayRotation = frame * 0.01;
     let rayRotation2 = -frame * 0.006;
 
-    //атмосферное свечение
+    //атмосферное свечение (бледнее)
     let atmosphere = ctx.createRadialGradient(sunX, sunY, 20, sunX, sunY, 180);
-    atmosphere.addColorStop(0, 'rgba(255,220,150,0.14)');
-    atmosphere.addColorStop(0.5, 'rgba(255,170,90,0.07)');
+    atmosphere.addColorStop(0, 'rgba(255,220,150,0.08)');   
+    atmosphere.addColorStop(0.5, 'rgba(255,170,90,0.04)'); 
     atmosphere.addColorStop(1, 'rgba(255,120,50,0)');
     ctx.fillStyle = atmosphere;
     ctx.beginPath();
@@ -674,7 +674,7 @@
         ctx.moveTo(30, 0);
         ctx.lineTo(len, -5);
         ctx.lineTo(len, 5);
-        ctx.fillStyle = `rgba(255,220,150,${0.18 + Math.sin(frame * 0.02 + i) * 0.08})`;
+        ctx.fillStyle = `rgba(255,220,150,${0.1 + Math.sin(frame * 0.02 + i) * 0.05})`;
         ctx.fill();
         ctx.restore();
     }
@@ -693,7 +693,7 @@
         ctx.moveTo(22, 0);
         ctx.lineTo(len, -3);
         ctx.lineTo(len, 3);
-        ctx.fillStyle = `rgba(255,245,200,${0.22 + Math.sin(frame * 0.03 + i) * 0.05})`;
+        ctx.fillStyle = `rgba(255,245,200,${0.12 + Math.sin(frame * 0.03 + i) * 0.04})`;
         ctx.fill();
         ctx.restore();
     }
@@ -701,8 +701,8 @@
 
     //внешний ореол
     let outer = ctx.createRadialGradient(sunX, sunY, 10, sunX, sunY, 85);
-    outer.addColorStop(0, 'rgba(255,235,180,0.55)');
-    outer.addColorStop(0.6, 'rgba(255,180,110,0.18)');
+    outer.addColorStop(0, 'rgba(255,235,180,0.35)'); 
+outer.addColorStop(0.6, 'rgba(255,180,110,0.1)');
     outer.addColorStop(1, 'rgba(255,140,80,0)');
     ctx.fillStyle = outer;
     ctx.beginPath();
@@ -711,19 +711,19 @@
     
     //ядро солнца
     let core = ctx.createRadialGradient(sunX - 5, sunY - 5, 0, sunX, sunY, 38);
-    core.addColorStop(0, '#fffef4');
-    core.addColorStop(0.25, '#ffe9b5');
-    core.addColorStop(0.7, '#ffc56d');
-    core.addColorStop(1, '#ff9738');
+    core.addColorStop(0, '#fffef0');   
+    core.addColorStop(0.25, '#ffe6b0');   
+    core.addColorStop(0.7, '#ffbc60');    
+    core.addColorStop(1, '#ff9028');      
     ctx.fillStyle = core;
     ctx.beginPath();
     ctx.arc(sunX, sunY, 34 * pulse, 0, Math.PI * 2);
-        ctx.fill();
+    ctx.fill();
 
     //центральная яркая точка
     ctx.beginPath();
     ctx.arc(sunX, sunY, 7, 0, Math.PI * 2);
-    ctx.fillStyle = 'rgba(255,255,245,0.95)';
+    ctx.fillStyle = 'rgba(255,255,240,0.85)';
     ctx.fill();
 
     //крест-блик
@@ -733,7 +733,7 @@
     ctx.moveTo(sunX, sunY - 18);
     ctx.lineTo(sunX, sunY + 18);
     ctx.lineWidth = 1.5;
-    ctx.strokeStyle = 'rgba(255,255,220,0.45)';
+    ctx.strokeStyle = 'rgba(255,255,210,0.35)';
     ctx.stroke();
 
     //парящие частицы
@@ -744,7 +744,7 @@
         let py = sunY + Math.sin(angle) * radius;
         ctx.beginPath();
         ctx.arc(px, py, 1.8 + Math.sin(frame * 0.04 + i) * 0.4, 0, Math.PI * 2);
-        ctx.fillStyle = `rgba(255,230,160,${0.35 + Math.sin(frame * 0.05 + i) * 0.15})`;
+        ctx.fillStyle = `rgba(255,230,160,${0.2 + Math.sin(frame * 0.05 + i) * 0.1})`;
         ctx.fill();
     }
         
@@ -941,32 +941,115 @@
             ctx.stroke();
         }
 
-        //игрок
-        ctx.save();
-        ctx.translate(player.x - cameraX, player.y - camY);
-        ctx.rotate(player.angle);
-        ctx.beginPath();
-        ctx.moveTo(12, -6);
-        ctx.lineTo(-4, -12);
-        ctx.lineTo(-10, -2);
-        ctx.lineTo(-4, 6);
-        ctx.fillStyle = '#FEF6E6';
+    //игрок
+    ctx.save();
+    ctx.translate(player.x - cameraX, player.y - camY);
+    ctx.rotate(player.angle);
+
+    let flap = Math.sin(frame * 0.18) * 0.8;
+    let scarfSwing = Math.max(-14, Math.min(14, -player.vy * 2.2));
+
+    ctx.shadowBlur = 12;
+    ctx.shadowColor = 'rgba(0,0,0,0.18)';
+
+    //крыло
+    let wingGrad = ctx.createLinearGradient(-12, -10, 18, 6);
+    wingGrad.addColorStop(0, '#FFF7EA');
+    wingGrad.addColorStop(0.45, '#FFE1B6');
+    wingGrad.addColorStop(1, '#FFC97A');
+
+    ctx.beginPath();
+    ctx.moveTo(18, -4);
+    ctx.quadraticCurveTo(8, -16 - flap, -6, -11);
+    ctx.quadraticCurveTo(-13, -2, -10, 5);
+    ctx.quadraticCurveTo(2, 2 + flap * 0.3, 18, -4);
+    ctx.fillStyle = wingGrad;
+    ctx.fill();
+
+    //нижняя тень крыла 
+    ctx.beginPath();
+    ctx.moveTo(12, -3);
+    ctx.quadraticCurveTo(2, 1, -6, 3);
+    ctx.quadraticCurveTo(2, 4, 12, -3);
+    ctx.fillStyle = 'rgba(140, 90, 40, 0.14)';
+    ctx.fill();
+
+    //стропы
+    ctx.beginPath();
+    ctx.moveTo(-2, -8); ctx.lineTo(-6, 4);
+    ctx.moveTo(4, -9);  ctx.lineTo(-1, 5);
+    ctx.moveTo(10, -6); ctx.lineTo(4, 5);
+    ctx.lineWidth = 1.1;
+    ctx.strokeStyle = '#B78D62';
+    ctx.stroke();
+
+    //тело
+    let bodyGrad = ctx.createLinearGradient(-5, 0, 4, 10);
+    bodyGrad.addColorStop(0, '#F3C98E');
+    bodyGrad.addColorStop(1, '#C9975E');
+
+    ctx.beginPath();
+    ctx.ellipse(-1, 5, 4, 5.5, 0.12, 0, Math.PI * 2);
+    ctx.fillStyle = bodyGrad;
+    ctx.fill();
+        
+    //голова
+    let headGrad = ctx.createRadialGradient(-4, 0, 1, -2, 2, 5);
+    headGrad.addColorStop(0, '#FFE2B7');
+    headGrad.addColorStop(1, '#D9A66C');
+
+    ctx.beginPath();
+    ctx.arc(-2.8, 1.8, 3.4, 0, Math.PI * 2);
+    ctx.fillStyle = headGrad;
+    ctx.fill();
+
+    //шарф
+    ctx.beginPath();
+    ctx.moveTo(1, 4);
+    ctx.quadraticCurveTo(-10, 5 + scarfSwing * 0.2, -18, 8 + scarfSwing);
+    ctx.quadraticCurveTo(-12, 7 + scarfSwing * 0.45, -2, 6);
+    ctx.lineWidth = 1;
+    ctx.strokeStyle = '#FFF1D6';
+    ctx.stroke();
+
+    //глаз
+    ctx.beginPath();
+    ctx.arc(-4.4, 1.2, 1, 0, Math.PI * 2);
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fill();
+
+    ctx.beginPath();
+    ctx.arc(-4.7, 1.1, 0.45, 0, Math.PI * 2);
+    ctx.fillStyle = '#2C2C2C';
         ctx.fill();
-        ctx.beginPath();
-        ctx.moveTo(10, -4);
-        ctx.lineTo(-2, -9);
-        ctx.lineTo(-7, -1);
-        ctx.fillStyle = '#FFD966';
-        ctx.fill();
-        ctx.beginPath();
-        ctx.arc(-3, 2, 3.5, 0, Math.PI * 2);
-        ctx.fillStyle = '#F2C94C';
-        ctx.fill();
-        ctx.fillStyle = '#FFFFFF';
-        ctx.beginPath();
-        ctx.arc(-4.5, 1, 1, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.restore();
+
+    //улыбка
+    ctx.beginPath();
+    ctx.arc(-3.2, 2.4, 1.2, 0.2, Math.PI - 0.2);
+    ctx.lineWidth = 0.8;
+    ctx.strokeStyle = '#8B5A2B';
+    ctx.stroke();
+
+    //ноги
+    ctx.beginPath();
+    ctx.moveTo(-3, 9);  
+    ctx.lineTo(-7, 13 + flap * 0.2);
+    ctx.moveTo(1, 9);
+    ctx.lineTo(4, 12);
+    ctx.lineWidth = 1.4;
+    ctx.strokeStyle = '#C79C6B';
+    ctx.stroke();
+
+    //свет сверху
+    ctx.beginPath();
+    ctx.moveTo(12, -5);
+    ctx.quadraticCurveTo(2, -12, -5, -8);
+    ctx.strokeStyle = 'rgba(255,255,255,0.22)';
+    ctx.lineWidth = 1.3;
+    ctx.stroke();
+
+    ctx.shadowBlur = 0;
+    ctx.restore();
 
         // искры (жёлтые, синие, облачные)
         for (let s of sparkParticles) {
