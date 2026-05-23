@@ -534,7 +534,7 @@
 
                 let cloudPenalty = Math.floor(20 + player.vx * 5);
                 score = Math.max(0, score - cloudPenalty);
-                
+
                 addCloudPoof(c.x, c.y, c.width);
                 playCloudHitSound();
                 clouds.splice(i, 1);
@@ -982,23 +982,14 @@ outer.addColorStop(0.6, 'rgba(255,180,110,0.1)');
             ctx.fill();
         }
         
-        // турбулентность
-        for (let i = 0; i < downdrafts.length; i++) {
-            let d = downdrafts[i];
-            let dx = player.x - d.x;
-            let dy = player.y - d.y;
-            if (Math.hypot(dx, dy) < d.radius + 9) {
-                player.vy += Math.abs(d.strength) * 0.55 * dt;
-                score = Math.max(0, score - 5);
-                addNegativeSpark(d.x, d.y);
-                downdrafts.splice(i, 1);
-                i--;
-                continue;
-            }
-            if (d.x < cameraX - 200) {
-                downdrafts.splice(i, 1);
-                i--;
-            }
+        //турбулентность
+        for (let d of downdrafts) {
+            let screenX = d.x - cameraX;
+            let screenY = d.y - camY;
+            ctx.beginPath();
+            ctx.arc(screenX, screenY, d.radius - 5, 0, Math.PI * 2);
+            ctx.fillStyle = `rgba(90, 110, 150, 0.24)`;
+            ctx.fill()
         }
         
         //отрисовка флага рекорда
