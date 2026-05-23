@@ -531,7 +531,10 @@
             let collisionDist = (c.width / 2) + 12;
             if (Math.abs(dx) < collisionDist && Math.abs(dy) < (c.height / 2) + 10) {
                 player.vx *= 0.85;
-                score = Math.max(0, score - 15);
+
+                let cloudPenalty = Math.floor(20 + player.vx * 5);
+                score = Math.max(0, score - cloudPenalty);
+                
                 addCloudPoof(c.x, c.y, c.width);
                 playCloudHitSound();
                 clouds.splice(i, 1);
