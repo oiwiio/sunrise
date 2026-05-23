@@ -545,6 +545,13 @@
             ctx.fillStyle = '#c9b28b';
             ctx.fillText(`лучший полёт: ${highScore} ✦`, canvas.width / 2 - 80, canvas.height - 60);
         }
+
+        if (!localStorage.getItem('sunrise_reset_done')) {
+        localStorage.removeItem('sunrise_lightness');
+        localStorage.setItem('sunrise_reset_done', 'true');
+        highScore = 0;
+        console.log('🏆 Рекорды сброшены (однократно)');
+    }
         
         // парящие частицы
         for (let i = 0; i < 12; i++) {
