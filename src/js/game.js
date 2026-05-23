@@ -11,6 +11,7 @@
 
     let highScorePosition = 0; 
     let showFlag = false;        
+    let highScorePositionY = 0;
     
     // облака - препядствия 
     let clouds = []; 
@@ -137,19 +138,18 @@
     }
 
     //облака - предпятсивя
-        function addCloudIfNeeded() {
-            if (clouds.length >= CLOUD_MAX) return;
-            if (Math.random() * 200 < 8) {  // ~4% шанс каждый кадр
-                clouds.push({
-                    x: cameraX + canvas.width + 50 + Math.random() * 200,
-                    y: 80 + Math.random() * (canvas.height - 150),
-                    width: 45 + Math.random() * 35,
-                    height: 25 + Math.random() * 20,
-                    speedY: (Math.random() - 0.5) * 0.4,
-                    life: 1.0,         // для эффекта при столкновении
-                    opacity: 0.7 + Math.random() * 0.3
-            });
-        }
+    function addCloudIfNeeded() {
+        if (clouds.length >= 4) return;
+        if (Math.random() * 300 < 5) return;
+        
+        clouds.push({
+            x: cameraX + canvas.width + 50 + Math.random() * 200,
+            y: 60 + Math.random() * (canvas.height - 120), 
+            width: 35 + Math.random() * 25,   
+            height: 20 + Math.random() * 15, 
+            speedY: (Math.random() - 0.5) * 0.3,
+            opacity: 0.7 + Math.random() * 0.3
+        });
     }
 
         // облака (движение и столкновение)
@@ -474,7 +474,8 @@
         //рекорд
          if (Math.floor(score) > highScore) {
             highScore = Math.floor(score);
-            highScorePosition = player.x;  // запоминаем позицию
+            highScorePosition = player.x;  // уже есть
+            highScorePositionY = player.y; // ← ДОБАВИТЬ ЭТУ СТРОКУ
             showFlag = true;
             try { localStorage.setItem('sunrise_lightness', highScore); } catch(e) {}
         }
@@ -651,25 +652,8 @@
         ctx.arc(canvas.width - 70, 65, 34, 0, Math.PI * 2);
         ctx.fillStyle = '#FFF1C1';
         ctx.fill();
-        
-        //дальние горы
-        ctx.fillStyle = '#3E2C49';
-        for (let seg of mountainSegments) {
-            let screenX = seg.x - cameraX;
-            let screenYBase = seg.y - camY;
-            if (screenX + segmentWidth > -50 && screenX < canvas.width + 100) {
-                ctx.beginPath();
-                ctx.moveTo(screenX, canvas.height);
-                ctx.lineTo(screenX, screenYBase - 20);
-                ctx.lineTo(screenX + segmentWidth * 0.3, screenYBase - 40);
-                ctx.lineTo(screenX + segmentWidth * 0.6, screenYBase - 18);
-                ctx.lineTo(screenX + segmentWidth, screenYBase - 28);
-                ctx.lineTo(screenX + segmentWidth, canvas.height);
-                ctx.fill();
-            }
-        }
-        
-        //ближние горы
+
+        //ближние горы (сглаженные)
         ctx.fillStyle = '#1D142B';
         for (let seg of mountainSegments) {
             let screenX = seg.x - cameraX;
@@ -678,13 +662,33 @@
                 ctx.beginPath();
                 ctx.moveTo(screenX, canvas.height);
                 ctx.lineTo(screenX, screenYBase);
-                ctx.lineTo(screenX + segmentWidth * 0.45, screenYBase - 28);
-                ctx.lineTo(screenX + segmentWidth, screenYBase - 10);
+                ctx.lineTo(screenX + segmentWidth * 0.25, screenYBase - 14);
+                ctx.lineTo(screenX + segmentWidth * 0.45, screenYBase - 24);
+                ctx.lineTo(screenX + segmentWidth * 0.65, screenYBase - 18);
+                ctx.lineTo(screenX + segmentWidth * 0.85, screenYBase - 10);
+                ctx.lineTo(screenX + segmentWidth, screenYBase - 6);
                 ctx.lineTo(screenX + segmentWidth, canvas.height);
                 ctx.fill();
             }
         }
-
+        
+        //дальние горы (сглаженные)
+        ctx.fillStyle = '#3E2C49';
+        for (let seg of mountainSegments) {
+            let screenX = seg.x - cameraX;
+            let screenYBase = seg.y - camY;
+            if (screenX + segmentWidth > -50 && screenX < canvas.width + 100) {
+                ctx.beginPath();
+                ctx.moveTo(screenX, canvas.height);
+                ctx.lineTo(screenX, screenYBase - 20);
+                ctx.lineTo(screenX + segmentWidth * 0.3, screenYBase - 38);
+                ctx.lineTo(screenX + segmentWidth * 0.55, screenYBase - 28);
+                ctx.lineTo(screenX + segmentWidth * 0.8, screenYBase - 18);
+                ctx.lineTo(screenX + segmentWidth, screenYBase - 14);
+                ctx.lineTo(screenX + segmentWidth, canvas.height);
+                ctx.fill();
+            }
+        }
         // облака
         for (let c of clouds) {
             let x = c.x - cameraX;
@@ -763,7 +767,7 @@
         }
         
         //отрисовка флага рекорда
-        drawRecordFlag(player.x, camY);
+        // drawRecordFlag(player.x, camY);
 
 
         // индикатор максимальной скорости
@@ -883,9 +887,25 @@
             ctx.font = '18px monospace';
             ctx.fillStyle = '#FFCF9A';
             ctx.fillText('НАЖМИ ПРОБЕЛ / КЛИК / ТАП → НОВЫЙ ПОЛЁТ', canvas.width / 2 - 210, canvas.height / 2 + 40);
+            
+            // звезда на месте рекорда
+            if (highScorePosition > 0) {
+                const starX = highScorePosition - cameraX;
+                const starY = highScorePositionY - camY;  // нужна будет отдельная переменная
+                
+                if (starX > -50 && starX < canvas.width + 50) {
+                    ctx.font = '24px monospace';
+                    ctx.fillStyle = '#FFD966';
+                    ctx.shadowBlur = 4;
+                    ctx.fillText('✦', starX - 10, starY - 20);
+                    
+                    ctx.font = '10px monospace';
+                    ctx.fillStyle = '#c9b28b';
+                    ctx.fillText('рекорд был здесь', starX - 55, starY - 5);
+                    ctx.shadowBlur = 0;
+                }
+            }
         }
-        
-        frame++;
     }
 
 
