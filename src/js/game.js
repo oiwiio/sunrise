@@ -42,7 +42,9 @@
     const DIVE_FORCE = 0.18;
     const LIFT_FORCE = 0.11;
     const MAX_VY = 3.8;
-    const MAX_VX_GROWTH = 8;
+    let MAX_VX_GROWTH = 8;
+    let settingsVolume = 0.5;
+    let settingsMaxSpeed = 8;
     const WIND_BOOST = 0.009; // ускорение от ветра
     
     let mountainSegments = [];
@@ -117,7 +119,7 @@
         let t = audioCtx.currentTime;
         let speed = Math.max(0, Math.min(1, player.vx / MAX_VX_GROWTH));
         // громкость растёт со скоростью
-        windGain.gain.setTargetAtTime(0.04 + speed * 0.13, t, 0.5);
+        windGain.gain.setTargetAtTime((0.04 + speed * 0.13) * settingsVolume, t, 0.5);
         // фильтр открывается на высокой скорости — ветер становится "острее"
         windFilterHigh.frequency.setTargetAtTime(800 + speed * 1400, t, 0.5);
     }
@@ -531,10 +533,7 @@
             let collisionDist = (c.width / 2) + 12;
             if (Math.abs(dx) < collisionDist && Math.abs(dy) < (c.height / 2) + 10) {
                 player.vx *= 0.85;
-
-                let cloudPenalty = Math.floor(20 + player.vx * 5);
-                score = Math.max(0, score - cloudPenalty);
-
+                score = Math.max(0, score - 15);
                 addCloudPoof(c.x, c.y, c.width);
                 playCloudHitSound();
                 clouds.splice(i, 1);
@@ -654,6 +653,77 @@
             ctx.arc(x, y, 2 + Math.sin(frame * 0.07 + i) * 1, 0, Math.PI * 2);
             ctx.fill();
         }
+
+        // панель настроек
+        drawSettingsPanel();
+    }
+
+    function drawSlider(x, y, w, t) {
+        // трек
+        ctx.beginPath();
+        ctx.roundRect(x, y, w, 6, 3);
+        ctx.fillStyle = 'rgba(255,217,181,0.14)';
+        ctx.fill();
+        // заполненная часть
+        if (t > 0) {
+            ctx.beginPath();
+            ctx.roundRect(x, y, w * t, 6, 3);
+            ctx.fillStyle = 'rgba(255,185,100,0.75)';
+            ctx.fill();
+        }
+        // ручка
+        ctx.beginPath();
+        ctx.arc(x + w * t, y + 3, 9, 0, Math.PI * 2);
+        ctx.fillStyle = '#FFD6A5';
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(255,255,255,0.25)';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+    }
+
+    function drawSettingsPanel() {
+        let px = canvas.width - 248;
+        let py = canvas.height / 2 - 60;
+        let pw = 210;
+
+        // подложка
+        ctx.fillStyle = 'rgba(10, 12, 20, 0.6)';
+        ctx.beginPath();
+        ctx.roundRect(px - 16, py - 32, pw + 32, 190, 14);
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(255, 217, 181, 0.1)';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+
+        // заголовок
+        ctx.font = 'bold 11px monospace';
+        ctx.fillStyle = 'rgba(255,217,181,0.45)';
+        ctx.fillText('⚙  НАСТРОЙКИ', px, py - 12);
+
+        //настройки
+        //громкость
+        ctx.font = '12px monospace';
+        ctx.fillStyle = '#ffd9b5';
+        ctx.fillText('ЗВУК', px, py + 14);
+        ctx.font = '11px monospace';
+        ctx.fillStyle = 'rgba(255,217,181,0.5)';
+        ctx.fillText(Math.round(settingsVolume * 100) + '%', px + pw - 28, py + 14);
+        drawSlider(px, py + 22, pw, settingsVolume);
+
+        //скорость
+        ctx.font = '12px monospace';
+        ctx.fillStyle = '#ffd9b5';
+        ctx.fillText('МАКС. СКОРОСТЬ', px, py + 80);
+        ctx.font = '11px monospace';
+        ctx.fillStyle = 'rgba(255,217,181,0.5)';
+        ctx.fillText('' + settingsMaxSpeed, px + pw - 18, py + 80);
+        let speedT = (settingsMaxSpeed - 8) / 12;
+        drawSlider(px, py + 88, pw, speedT);
+
+        ctx.font = '10px monospace';
+        ctx.fillStyle = 'rgba(255,217,181,0.3)';
+        ctx.fillText('8', px, py + 118);
+        ctx.fillText('20', px + pw - 14, py + 118);
     }
 
     //флажек рекорда
@@ -982,14 +1052,14 @@ outer.addColorStop(0.6, 'rgba(255,180,110,0.1)');
             ctx.fill();
         }
         
-        //турбулентность
+        // турбулентность (только рендер)
         for (let d of downdrafts) {
             let screenX = d.x - cameraX;
             let screenY = d.y - camY;
             ctx.beginPath();
             ctx.arc(screenX, screenY, d.radius - 5, 0, Math.PI * 2);
-            ctx.fillStyle = `rgba(90, 110, 150, 0.24)`;
-            ctx.fill()
+            ctx.fillStyle = 'rgba(90, 110, 150, 0.24)';
+            ctx.fill();
         }
         
         //отрисовка флага рекорда
@@ -1279,61 +1349,103 @@ outer.addColorStop(0.6, 'rgba(255,180,110,0.1)');
         for (let i = 0; i < 2; i++) addThermalIfNeeded();
     }
     
-    //управление с поддержкой приветственного экрана
+    // ========= ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ДЛЯ УПРАВЛЕНИЯ =========
+
+    function getCanvasPos(e) {
+        let rect = canvas.getBoundingClientRect();
+        let scaleX = canvas.width / rect.width;
+        let scaleY = canvas.height / rect.height;
+        let clientX = e.touches ? e.touches[0].clientX : e.clientX;
+        let clientY = e.touches ? e.touches[0].clientY : e.clientY;
+        return { x: (clientX - rect.left) * scaleX, y: (clientY - rect.top) * scaleY };
+    }
+
+    function getSliderHit(cx, cy) {
+        let px = canvas.width - 240;
+        let py = canvas.height / 2 - 60;
+        let pw = 210;
+        if (cx >= px - 10 && cx <= px + pw + 10) {
+            if (cy >= py + 16 && cy <= py + 44) return 'volume';
+            if (cy >= py + 82 && cy <= py + 110) return 'speed';
+        }
+        return null;
+    }
+
+    function applySliderDrag(slider, cx) {
+        let px = canvas.width - 240;
+        let pw = 210;
+        let t = Math.max(0, Math.min(1, (cx - px) / pw));
+        if (slider === 'volume') {
+            settingsVolume = t;
+        } else if (slider === 'speed') {
+            settingsMaxSpeed = Math.round(8 + t * 12);
+            MAX_VX_GROWTH = settingsMaxSpeed;
+        }
+    }
+
+    let activeSlider = null;
+
     function handlePressStart(e) {
-        initAudio();  // браузер требует жест пользователя для старта аудио
-        // если показываем приветственный экран — запускаем игру
+        initAudio();
+
         if (showWelcome) {
+            let pos = getCanvasPos(e);
+            let hit = getSliderHit(pos.x, pos.y);
+            if (hit) {
+                activeSlider = hit;
+                applySliderDrag(hit, pos.x);
+                e.preventDefault();
+                return;
+            }
             startGameFromWelcome();
             e.preventDefault();
             return;
         }
-        
-        if (!gameRunning) {
-            restartGame();
-            return;
-        }
+
+        if (!gameRunning) { restartGame(); return; }
         isPressing = true;
         e.preventDefault();
     }
-    
+
+    function handlePressMove(e) {
+        if (!activeSlider) return;
+        let pos = getCanvasPos(e);
+        applySliderDrag(activeSlider, pos.x);
+        e.preventDefault();
+    }
+
     function handlePressEnd(e) {
+        if (activeSlider) {
+            activeSlider = null;
+            e.preventDefault();
+            return;
+        }
         if (showWelcome) return;
         if (!gameRunning) return;
         isPressing = false;
         e.preventDefault();
     }
-    
+
     function bindControls() {
         window.addEventListener('keydown', (e) => {
-            if (e.code === 'Space') {
-                e.preventDefault();
-                handlePressStart(e);
-            }
+            if (e.code === 'Space') { e.preventDefault(); handlePressStart(e); }
         });
         window.addEventListener('keyup', (e) => {
-            if (e.code === 'Space') {
-                e.preventDefault();
-                handlePressEnd(e);
-            }
+            if (e.code === 'Space') { e.preventDefault(); handlePressEnd(e); }
         });
         canvas.addEventListener('mousedown', handlePressStart);
+        window.addEventListener('mousemove', handlePressMove);
         window.addEventListener('mouseup', handlePressEnd);
-        canvas.addEventListener('touchstart', (e) => {
-            e.preventDefault();
-            handlePressStart(e);
-        });
-        window.addEventListener('touchend', (e) => {
-            e.preventDefault();
-            handlePressEnd(e);
-        });
+        canvas.addEventListener('touchstart', (e) => { e.preventDefault(); handlePressStart(e); }, { passive: false });
+        window.addEventListener('touchmove', (e) => { e.preventDefault(); handlePressMove(e); }, { passive: false });
+        window.addEventListener('touchend', (e) => { e.preventDefault(); handlePressEnd(e); }, { passive: false });
         canvas.addEventListener('contextmenu', (e) => e.preventDefault());
     }
-    
+
     //запуск
     initMountains();
     bindControls();
-    
+
     function animate(timestamp) {
         requestAnimationFrame(animate);
         if (timestamp - lastUpdate >= FRAME_TIME) {
