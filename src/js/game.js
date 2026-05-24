@@ -58,13 +58,18 @@
     
     // игрок с полной физикой (двигается и по X, и по Y)
     let player = {
-        x: LOGICAL_W * 0.35,
-        y: LOGICAL_H * 0.55,
+        x: 0, // будет выставлено в resetPlayerPos() после resizeCanvas
+        y: 0,
         vx: 5.2,
         vy: 0,
         angle: 0,
         radius: 9
     };
+
+    function resetPlayerPos() {
+        player.x = LOGICAL_W * 0.35;
+        player.y = LOGICAL_H * 0.55;
+    }
     
     let cameraX = 0;  // камера следует за игроком
     let isPressing = false;
@@ -252,11 +257,11 @@
     //горы
     function initMountains() {
         mountainSegments = [];
-        let lastHeight = canvas.height - 85;
+        let lastHeight = LOGICAL_H - 85;
         for (let i = 0; i < 20; i++) {
             let variation = (Math.random() - 0.5) * 42;
             let newHeight = lastHeight + variation;
-            newHeight = Math.min(canvas.height - 35, Math.max(canvas.height - 180, newHeight));
+            newHeight = Math.min(LOGICAL_H - 35, Math.max(LOGICAL_H - 180, newHeight));
             mountainSegments.push({
                 x: i * segmentWidth,
                 y: newHeight,
@@ -275,7 +280,7 @@
         let lastY = lastSeg.y;
         let variation = (Math.random() - 0.5) * 48;
         let newY = lastY + variation;
-        newY = Math.min(canvas.height - 35, Math.max(canvas.height - 190, newY));
+        newY = Math.min(LOGICAL_H - 35, Math.max(LOGICAL_H - 190, newY));
         mountainSegments.push({
             x: lastSeg.x + segmentWidth,
             y: newY,
@@ -292,8 +297,8 @@
         if (thermals.length >= THERMAL_MAX) return;
         if (Math.random() * 300 < THERMAL_GEN_RATE) {
             thermals.push({
-                x: cameraX + canvas.width + 40 + Math.random() * 180,
-                y: 70 + Math.random() * (canvas.height - 150),
+                x: cameraX + LOGICAL_W + 40 + Math.random() * 180,
+                y: 70 + Math.random() * (LOGICAL_H - 150),
                 radius: 32 + Math.random() * 18,
                 pulse: Math.random() * Math.PI * 2,
                 strength: 0.28 + Math.random() * 0.18
@@ -305,8 +310,8 @@
         if (downdrafts.length >= DOWNDRAFT_MAX) return;
         if (Math.random() * 350 < DOWNDRAFT_GEN_RATE) {
             downdrafts.push({
-                x: cameraX + canvas.width + 30 + Math.random() * 200,
-                y: 50 + Math.random() * (canvas.height - 100),
+                x: cameraX + LOGICAL_W + 30 + Math.random() * 200,
+                y: 50 + Math.random() * (LOGICAL_H - 100),
                 radius: 35 + Math.random() * 20,
                 strength: -0.22 - Math.random() * 0.15
             });
@@ -333,8 +338,8 @@
         if (Math.random() * 300 < 5) return;
         
         clouds.push({
-            x: cameraX + canvas.width + 50 + Math.random() * 200,
-            y: 60 + Math.random() * (canvas.height - 120), 
+            x: cameraX + LOGICAL_W + 50 + Math.random() * 200,
+            y: 60 + Math.random() * (LOGICAL_H - 120), 
             width: 35 + Math.random() * 25,   
             height: 20 + Math.random() * 15, 
             speedY: (Math.random() - 0.5) * 0.3,
@@ -349,8 +354,8 @@
         if (Math.random() > 0.2 + intensity * 0.15) return;
         
         windParticles.push({
-            x: canvas.width + 10 + Math.random() * 80,
-            y: Math.random() * canvas.height,
+            x: LOGICAL_W + 10 + Math.random() * 80,
+            y: Math.random() * LOGICAL_H,
             length: 12 + Math.random() * 20,
             width: 0.8 + Math.random() * 1.2,
             life: 0.6 + Math.random() * 0.5,
@@ -368,8 +373,8 @@
         if (Math.random() > 0.12) return;
         
         windParticles.push({
-            x: canvas.width + 40 + Math.random() * 120,
-            y: Math.random() * canvas.height,
+            x: LOGICAL_W + 40 + Math.random() * 120,
+            y: Math.random() * LOGICAL_H,
             length: 35 + Math.random() * 50,
             width: 1.8 + Math.random() * 2.5,
             life: 0.9 + Math.random() * 0.6,
@@ -415,7 +420,7 @@
             s.y += s.vy;
             s.vy += 0.08;
             s.life -= 0.025;
-            if (s.life <= 0 || s.y > canvas.height + 50) {
+            if (s.life <= 0 || s.y > LOGICAL_H + 50) {
                 sparkParticles.splice(i, 1);
                 i--;
             }
@@ -432,7 +437,7 @@
     //Y камеры (камера следует за Y игрока)
     let cameraYOffset = 0;
     function updateCameraY() {
-        let targetCamY = player.y - canvas.height / 2;
+        let targetCamY = player.y - LOGICAL_H / 2;
         cameraYOffset += (targetCamY - cameraYOffset) * 0.05;
     }
     function getCameraY() {
@@ -507,7 +512,7 @@
         player.x += player.vx * dt;
         
         //камера за игроком
-        cameraX = player.x - canvas.width * 0.35;
+        cameraX = player.x - LOGICAL_W * 0.35;
         if (cameraX < 0) cameraX = 0;
         
         //границы по вертикали
@@ -538,7 +543,7 @@
                 }
             }
         }
-        if (player.y + 12 >= canvas.height - 18) groundCollision = true;
+        if (player.y + 12 >= LOGICAL_H - 18) groundCollision = true;
         if (groundCollision) {
             gameRunning = false;
             playDeathSound();
@@ -605,7 +610,7 @@
         // генерация гор
         if (mountainSegments.length > 0) {
             let lastBlock = mountainSegments[mountainSegments.length - 1];
-            if (lastBlock.x < cameraX + canvas.width + 200) {
+            if (lastBlock.x < cameraX + LOGICAL_W + 200) {
                 extendWorld();
             }
         } else {
@@ -1451,14 +1456,11 @@
     function restartGame() {
         gameRunning = true;
         score = 0;
-        player = {
-            x: LOGICAL_W * 0.35,
-            y: LOGICAL_H * 0.55,
-            vx: 3.8,
-            vy: 0,
-            angle: 0,
-            radius: 9
-        };
+        resetPlayerPos();
+        player.vx = 3.8;
+        player.vy = 0;
+        player.angle = 0;
+        player.radius = 9;
         cameraX = 0;
         cameraYOffset = 0;
         thermals = [];
@@ -1516,8 +1518,37 @@
     }
 
     let activeSlider = null;
+    let isPortrait = false;
+
+    function handleOrientationChange() {
+        const portrait = window.innerHeight > window.innerWidth;
+        if (portrait === isPortrait) return;
+        isPortrait = portrait;
+
+        let overlay = document.querySelector('.rotate-overlay');
+        if (!overlay) {
+            overlay = document.createElement('div');
+            overlay.className = 'rotate-overlay';
+            overlay.innerHTML = `
+                <div class="rotate-message">
+                    <div class="rotate-icon">📱</div>
+                    <div class="rotate-text">ПОВЕРНИТЕ ТЕЛЕФОН</div>
+                    <div class="rotate-hint">Игра оптимизирована для горизонтального экрана</div>
+                    <div class="rotate-sub">ROTATE TO PLAY</div>
+                </div>`;
+            document.body.appendChild(overlay);
+        }
+
+        if (portrait) {
+            overlay.style.display = 'flex';
+            isPressing = false;
+        } else {
+            overlay.style.display = 'none';
+        }
+    }
 
     function handlePressStart(e) {
+        if (isPortrait) return;
         initAudio();
 
         if (showWelcome) {
@@ -1576,9 +1607,14 @@
 
     //запуск
     resizeCanvas();
-    window.addEventListener('resize', resizeCanvas);
+    resetPlayerPos();
+    window.addEventListener('resize', () => {
+        resizeCanvas();
+        handleOrientationChange();
+    });
     initMountains();
     bindControls();
+    handleOrientationChange();
 
     function animate(timestamp) {
         requestAnimationFrame(animate);
