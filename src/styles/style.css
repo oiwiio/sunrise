@@ -20,25 +20,18 @@
     -webkit-tap-highlight-color: transparent;
 }
 
-html,
-body {
+html, body {
+    margin: 0;
     width: 100%;
     height: 100%;
     overflow: hidden;
-    background:
-        radial-gradient(
-            circle at top,
-            rgba(255,217,181,0.06),
-            transparent 35%
-        ),
-        var(--bg);
-    color: var(--accent);
-    font-family:
-        "Segoe UI",
-        "Inter",
-        "Courier New",
-        monospace;
+    background: #000;
+
+    display: flex;
+    justify-content: center;
+    align-items: center;
 }
+
 
 body {
     display: flex;
@@ -46,6 +39,11 @@ body {
     align-items: center;
     position: relative;
     isolation: isolate;
+    body {
+    margin: 0;
+    background: #000;
+
+}
 }
 
 body::after {
@@ -64,18 +62,7 @@ body::after {
 
 canvas {
     display: block;
-    width: 100vw;
-    height: 100vh;
-    object-fit: contain;
-    background: var(--bg);
-    image-rendering: auto;
-    box-shadow:
-        0 0 80px rgba(255,217,181,0.04),
-        0 25px 80px rgba(0,0,0,0.55);
 
-    transition:
-        filter 0.3s ease,
-        transform 0.3s ease;
 }
 
 canvas:active {

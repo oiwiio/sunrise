@@ -2,8 +2,39 @@
     const canvas = document.getElementById('gameCanvas');
     const ctx = canvas.getContext('2d');
 
-    canvas.width = 1000;
-    canvas.height = 600;
+    // Динамическое логическое разрешение — подстраивается под экран
+    const BASE_W = 1600;
+    const BASE_H = 800;
+
+    let LOGICAL_W = BASE_W;
+    let LOGICAL_H = BASE_H;
+    let UI_SCALE  = 1;
+
+    function resizeCanvas() {
+        const DPR = window.devicePixelRatio || 1;
+
+        const viewW = window.innerWidth;
+        const viewH = window.innerHeight;
+
+        // Канвас на весь экран, без чёрных полос
+        canvas.style.width  = viewW + 'px';
+        canvas.style.height = viewH + 'px';
+
+        // Логическое разрешение = реальные CSS-пиксели
+        LOGICAL_W = viewW;
+        LOGICAL_H = viewH;
+
+        // Буфер под retina
+        canvas.width  = Math.round(LOGICAL_W * DPR);
+        canvas.height = Math.round(LOGICAL_H * DPR);
+
+        // Рисуем в логических координатах
+        ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+        ctx.imageSmoothingEnabled = true;
+
+        // UI_SCALE: 1.0 при BASE_W×BASE_H, меньше на маленьких экранах
+        UI_SCALE = Math.max(0.38, Math.min(LOGICAL_W / BASE_W, LOGICAL_H / BASE_H));
+    }
 
     let gameRunning = true;
     let score = 0;
@@ -27,8 +58,8 @@
     
     // игрок с полной физикой (двигается и по X, и по Y)
     let player = {
-        x: canvas.width * 0.35,
-        y: canvas.height * 0.55,
+        x: LOGICAL_W * 0.35,
+        y: LOGICAL_H * 0.55,
         vx: 5.2,
         vy: 0,
         angle: 0,
@@ -46,6 +77,18 @@
     let settingsVolume = 0.5;
     let settingsMaxSpeed = 8;
     const WIND_BOOST = 0.009; // ускорение от ветра
+
+    // Пороги увеличения максимальной скорости ветра
+    // { score: очки, speed: новый лимит }
+    const WIND_MILESTONES = [
+        { score:  5000, speed: 10 },
+        { score: 10000, speed: 12 },
+        { score: 15000, speed: 14 },
+        { score: 20000, speed: 16 },
+        { score: 25000, speed: 18 },
+        { score: 30000, speed: 20 },
+    ];
+    let windMilestoneIndex = 0; // следующий не пройденный порог
     
     let mountainSegments = [];
     const segmentWidth = 210;
@@ -53,10 +96,18 @@
     let thermals = [];
     let downdrafts = [];
 
-    const THERMAL_GEN_RATE = 85;
-    const THERMAL_MAX = 7;
-    const DOWNDRAFT_GEN_RATE = 110;
-    const DOWNDRAFT_MAX = 4;
+    const THERMAL_GEN_BASE   = 85;
+    const THERMAL_MAX_BASE   = 7;
+    const DOWNDRAFT_GEN_BASE = 110;
+    const DOWNDRAFT_MAX_BASE = 4;
+
+    let THERMAL_GEN_RATE   = THERMAL_GEN_BASE;
+    let THERMAL_MAX        = THERMAL_MAX_BASE;
+    let DOWNDRAFT_GEN_RATE = DOWNDRAFT_GEN_BASE;
+    let DOWNDRAFT_MAX      = DOWNDRAFT_MAX_BASE;
+    let diffLevel          = 0;
+    let diffNoticeTimer    = 0;
+    let diffNoticeLevel    = 0;
     
     let windParticles = [];
     let sparkParticles = [];
@@ -64,7 +115,7 @@
     const FRAME_TIME = 1000 / 60;
     let lastUpdate = 0;
 
-    // ============ ЗВУК (Web Audio API) ============
+    //звук
     let audioCtx = null;
     let windGain = null, windFilterHigh = null;
     let windNode = null;
@@ -182,7 +233,7 @@
         osc.start(t);
         osc.stop(t + 0.61);
     }
-    // =============================================
+    
 
     
     //рекорд
@@ -389,6 +440,45 @@
     }
     
 
+    function showDiffNotice(level) {
+        diffNoticeLevel = level;
+        diffNoticeTimer = 180;
+    }
+
+    let windNoticeTimer = 0;
+    let windNoticeSpeed = 0;
+
+    function showWindSpeedNotice(speed) {
+        windNoticeSpeed = speed;
+        windNoticeTimer = 220;
+    }
+
+    function updateDifficulty() {
+        // 10 уровней сложности растянуты до 30 000 очков — по 3 000 на уровень
+        let newLevel = Math.min(10, Math.floor(score / 3000));
+        if (newLevel !== diffLevel) {
+            diffLevel = newLevel;
+            let t = diffLevel / 10;
+            THERMAL_GEN_RATE   = THERMAL_GEN_BASE   * (1 - t * 0.55);
+            THERMAL_MAX        = Math.max(2, Math.round(THERMAL_MAX_BASE   * (1 - t * 0.5)));
+            DOWNDRAFT_GEN_RATE = DOWNDRAFT_GEN_BASE * (1 + t * 1.8);
+            DOWNDRAFT_MAX      = Math.min(10, Math.round(DOWNDRAFT_MAX_BASE * (1 + t * 1.5)));
+            showDiffNotice(diffLevel);
+        }
+
+        // Постепенное увеличение потолка скорости ветра по очкам
+        while (
+            windMilestoneIndex < WIND_MILESTONES.length &&
+            score >= WIND_MILESTONES[windMilestoneIndex].score
+        ) {
+            let ms = WIND_MILESTONES[windMilestoneIndex];
+            // Повышаем только если игрок не выставил меньше в настройках
+            MAX_VX_GROWTH = Math.max(ms.speed, settingsMaxSpeed);
+            showWindSpeedNotice(ms.speed);
+            windMilestoneIndex++;
+        }
+    }
+
     //обновление
     function updateGame(delta) {
         if (!gameRunning) return;
@@ -548,6 +638,8 @@
         }
         addCloudIfNeeded();
         
+        updateDifficulty();
+
         // счёт
         let isMaxSpeed = (player.vx > MAX_VX_GROWTH - 0.8);
         if (isMaxSpeed) {
@@ -609,38 +701,39 @@
         }
         
         // заголовок
-        ctx.font = 'bold 56px "Segoe UI", "Courier New", monospace';
+        const s = UI_SCALE;
+        ctx.font = `bold ${Math.round(56*s)}px "Segoe UI", "Courier New", monospace`;
         ctx.fillStyle = '#FFF9E8';
         ctx.shadowBlur = 8;
         ctx.shadowColor = 'rgba(0,0,0,0.5)';
-        ctx.fillText('SUNRISE', canvas.width / 2 - 130, canvas.height / 2 - 80);
+        ctx.fillText('SUNRISE', canvas.width / 2 - Math.round(130*s), canvas.height / 2 - Math.round(80*s));
         ctx.shadowBlur = 0;
         
-        // подзаголовок (пустая строка, можно убрать или оставить)
-        ctx.font = '18px monospace';
+        // подзаголовок
+        ctx.font = `${Math.round(18*s)}px monospace`;
         ctx.fillStyle = '#FFD6A5';
-        ctx.fillText('', canvas.width / 2 - 85, canvas.height / 2 - 30);
+        ctx.fillText('', canvas.width / 2 - Math.round(85*s), canvas.height / 2 - Math.round(30*s));
         
         // описание управления
-        ctx.font = '14px monospace';
+        ctx.font = `${Math.round(14*s)}px monospace`;
         ctx.fillStyle = '#ffd9b5';
-        ctx.fillText('ЗАЖМИ — ПИКИРУЙ', canvas.width / 2 - 100, canvas.height / 2 + 40);
-        ctx.fillText('ОТПУСТИ — ПАРИ', canvas.width / 2 - 90, canvas.height / 2 + 68);
+        ctx.fillText('ЗАЖМИ — ПИКИРУЙ', canvas.width / 2 - Math.round(100*s), canvas.height / 2 + Math.round(40*s));
+        ctx.fillText('ОТПУСТИ — ПАРИ', canvas.width / 2 - Math.round(90*s), canvas.height / 2 + Math.round(68*s));
         
-        // подсказка для мобильных (всегда показываем на приветственном экране)
-        ctx.fillText('ПОВЕРНИТЕ ТЕЛЕФОН', canvas.width / 2 - 100, canvas.height / 2 + 105);
-        ctx.fillText('ДЛЯ КОМФОРТНОЙ ИГРЫ', canvas.width / 2 - 100, canvas.height / 2 + 125);
+        // подсказка для мобильных
+        ctx.fillText('ПОВЕРНИТЕ ТЕЛЕФОН', canvas.width / 2 - Math.round(100*s), canvas.height / 2 + Math.round(105*s));
+        ctx.fillText('ДЛЯ КОМФОРТНОЙ ИГРЫ', canvas.width / 2 - Math.round(100*s), canvas.height / 2 + Math.round(125*s));
     
         // визуальная подсказка
-        ctx.font = 'bold 18px monospace';
+        ctx.font = `bold ${Math.round(18*s)}px monospace`;
         ctx.fillStyle = '#FFCF9A';
-        ctx.fillText('--> ЛЮБОЕ НАЖАТИЕ <--', canvas.width / 2 - 110, canvas.height / 2 + 165);
+        ctx.fillText('--> ЛЮБОЕ НАЖАТИЕ <--', canvas.width / 2 - Math.round(110*s), canvas.height / 2 + Math.round(165*s));
         
         // рекорд
         if (highScore > 0) {
-            ctx.font = '13px monospace';
+            ctx.font = `${Math.round(13*s)}px monospace`;
             ctx.fillStyle = '#c9b28b';
-            ctx.fillText(`лучший полёт: ${highScore} ✦`, canvas.width / 2 - 80, canvas.height - 60);
+            ctx.fillText(`лучший полёт: ${highScore} ✦`, canvas.width / 2 - Math.round(80*s), canvas.height - Math.round(60*s));
         }
 
         
@@ -658,22 +751,23 @@
         drawSettingsPanel();
     }
 
-    function drawSlider(x, y, w, t) {
-        // трек
+    function drawSlider(x, y, w, t, s) {
+        s = s || 1;
+        const h = Math.round(6*s);
+        const r = Math.round(3*s);
+        const knob = Math.round(9*s);
         ctx.beginPath();
-        ctx.roundRect(x, y, w, 6, 3);
+        ctx.roundRect(x, y, w, h, r);
         ctx.fillStyle = 'rgba(255,217,181,0.14)';
         ctx.fill();
-        // заполненная часть
         if (t > 0) {
             ctx.beginPath();
-            ctx.roundRect(x, y, w * t, 6, 3);
+            ctx.roundRect(x, y, w * t, h, r);
             ctx.fillStyle = 'rgba(255,185,100,0.75)';
             ctx.fill();
         }
-        // ручка
         ctx.beginPath();
-        ctx.arc(x + w * t, y + 3, 9, 0, Math.PI * 2);
+        ctx.arc(x + w * t, y + h/2, knob, 0, Math.PI * 2);
         ctx.fillStyle = '#FFD6A5';
         ctx.fill();
         ctx.strokeStyle = 'rgba(255,255,255,0.25)';
@@ -682,48 +776,45 @@
     }
 
     function drawSettingsPanel() {
-        let px = canvas.width - 248;
-        let py = canvas.height / 2 - 60;
-        let pw = 210;
+        const s = UI_SCALE;
+        let pw = Math.round(210 * s);
+        let px = canvas.width - Math.round(248 * s);
+        let py = canvas.height / 2 - Math.round(60 * s);
 
         // подложка
         ctx.fillStyle = 'rgba(10, 12, 20, 0.6)';
         ctx.beginPath();
-        ctx.roundRect(px - 16, py - 32, pw + 32, 190, 14);
+        ctx.roundRect(px - Math.round(16*s), py - Math.round(32*s), pw + Math.round(32*s), Math.round(190*s), Math.round(14*s));
         ctx.fill();
         ctx.strokeStyle = 'rgba(255, 217, 181, 0.1)';
         ctx.lineWidth = 1;
         ctx.stroke();
 
-        // заголовок
-        ctx.font = 'bold 11px monospace';
+        ctx.font = `bold ${Math.round(11*s)}px monospace`;
         ctx.fillStyle = 'rgba(255,217,181,0.45)';
-        ctx.fillText('⚙  НАСТРОЙКИ', px, py - 12);
+        ctx.fillText('⚙  НАСТРОЙКИ', px, py - Math.round(12*s));
 
-        //настройки
-        //громкость
-        ctx.font = '12px monospace';
+        ctx.font = `${Math.round(12*s)}px monospace`;
         ctx.fillStyle = '#ffd9b5';
-        ctx.fillText('ЗВУК', px, py + 14);
-        ctx.font = '11px monospace';
+        ctx.fillText('ЗВУК', px, py + Math.round(14*s));
+        ctx.font = `${Math.round(11*s)}px monospace`;
         ctx.fillStyle = 'rgba(255,217,181,0.5)';
-        ctx.fillText(Math.round(settingsVolume * 100) + '%', px + pw - 28, py + 14);
-        drawSlider(px, py + 22, pw, settingsVolume);
+        ctx.fillText(Math.round(settingsVolume * 100) + '%', px + pw - Math.round(28*s), py + Math.round(14*s));
+        drawSlider(px, py + Math.round(22*s), pw, settingsVolume, s);
 
-        //скорость
-        ctx.font = '12px monospace';
+        ctx.font = `${Math.round(12*s)}px monospace`;
         ctx.fillStyle = '#ffd9b5';
-        ctx.fillText('МАКС. СКОРОСТЬ', px, py + 80);
-        ctx.font = '11px monospace';
+        ctx.fillText('МАКС. СКОРОСТЬ', px, py + Math.round(80*s));
+        ctx.font = `${Math.round(11*s)}px monospace`;
         ctx.fillStyle = 'rgba(255,217,181,0.5)';
-        ctx.fillText('' + settingsMaxSpeed, px + pw - 18, py + 80);
+        ctx.fillText('' + settingsMaxSpeed, px + pw - Math.round(18*s), py + Math.round(80*s));
         let speedT = (settingsMaxSpeed - 8) / 12;
-        drawSlider(px, py + 88, pw, speedT);
+        drawSlider(px, py + Math.round(88*s), pw, speedT, s);
 
-        ctx.font = '10px monospace';
+        ctx.font = `${Math.round(10*s)}px monospace`;
         ctx.fillStyle = 'rgba(255,217,181,0.3)';
-        ctx.fillText('8', px, py + 118);
-        ctx.fillText('20', px + pw - 14, py + 118);
+        ctx.fillText('8', px, py + Math.round(118*s));
+        ctx.fillText('20', px + pw - Math.round(14*s), py + Math.round(118*s));
     }
 
     //флажек рекорда
@@ -869,7 +960,7 @@
     //внешний ореол
     let outer = ctx.createRadialGradient(sunX, sunY, 10, sunX, sunY, 85);
     outer.addColorStop(0, 'rgba(255,235,180,0.35)'); 
-outer.addColorStop(0.6, 'rgba(255,180,110,0.1)');
+    outer.addColorStop(0.6, 'rgba(255,180,110,0.1)');
     outer.addColorStop(1, 'rgba(255,140,80,0)');
     ctx.fillStyle = outer;
     ctx.beginPath();
@@ -1239,33 +1330,63 @@ outer.addColorStop(0.6, 'rgba(255,180,110,0.1)');
         }
 
         //ui
-        ctx.font = 'bold 28px "Segoe UI", "Courier New", monospace';
+        const s = UI_SCALE;
+        if (diffNoticeTimer > 0) {
+            diffNoticeTimer--;
+            let alpha = Math.min(1, diffNoticeTimer / 40);
+            let msgs = ['','ВЕТЕР УСИЛИВАЕТСЯ...','НЕБО МЕНЯЕТСЯ','ТРУДНЕЕ...',
+                        'ОПАСНЫЕ ПОТОКИ','ТЕРМИКОВ МЕНЬШЕ','ДЕРЖИСЬ!',
+                        'ШТОРМ БЛИЗКО','КРИТИЧЕСКАЯ ЗОНА','НА ПРЕДЕЛЕ','МАКСИМАЛЬНАЯ БУРЯ'];
+            ctx.save();
+            ctx.font = `bold ${Math.round(16*UI_SCALE)}px monospace`;
+            ctx.fillStyle = 'rgba(255, 160, 80, ' + alpha + ')';
+            ctx.textAlign = 'center';
+            ctx.fillText(msgs[diffNoticeLevel] || '', canvas.width / 2, canvas.height / 2 - 80);
+            ctx.textAlign = 'left';
+            ctx.restore();
+        }
+
+        // уведомление о росте потолка скорости ветра
+        if (windNoticeTimer > 0) {
+            windNoticeTimer--;
+            let alpha = Math.min(1, windNoticeTimer / 40);
+            ctx.save();
+            ctx.font = `bold ${Math.round(15*UI_SCALE)}px monospace`;
+            ctx.fillStyle = `rgba(255, 230, 100, ${alpha})`;
+            ctx.textAlign = 'center';
+            ctx.fillText(`⚡ ВЕТЕР КРЕПЧАЕТ — МАКС. ${windNoticeSpeed}`, canvas.width / 2, canvas.height / 2 - Math.round(55*UI_SCALE));
+            ctx.textAlign = 'left';
+            ctx.restore();
+        }
+        ctx.font = `bold ${Math.round(28*s)}px "Segoe UI", "Courier New", monospace`;
         ctx.fillStyle = '#FFF9E8';
-        ctx.fillText(`✦ ${Math.floor(score)}`, 28, 58);
-        ctx.font = '14px monospace';
+        ctx.fillText('✦ ' + Math.floor(score), Math.round(28*s), Math.round(58*s));
+        ctx.font = `${Math.round(14*s)}px monospace`;
         ctx.fillStyle = '#FFD6A5';
-        ctx.fillText(`РЕКОРД ${highScore}`, 28, 96);
+        ctx.fillText(`РЕКОРД ${highScore}`, Math.round(28*s), Math.round(96*s));
         
         let windPercent = Math.min(100, Math.floor((player.vx - 3) / 6 * 100));
+        const barX = Math.round(28*s), barY = Math.round(115*s), barW = Math.round(120*s), barH = Math.round(8*s);
+        const filled = Math.max(Math.round(10*s), Math.round(windPercent * 1.2 * s));
         ctx.fillStyle = '#FFF2BF';
-        ctx.fillRect(28, 115, Math.max(10, windPercent * 1.2), 8);
+        ctx.fillRect(barX, barY, filled, barH);
         ctx.fillStyle = '#D9C291';
-        ctx.fillRect(28 + Math.max(10, windPercent * 1.2), 115, 100 - Math.max(10, windPercent * 1.2), 8);
+        ctx.fillRect(barX + filled, barY, barW - filled, barH);
         ctx.fillStyle = '#FFEFC0';
-        ctx.font = '10px monospace';
-        ctx.fillText(`ВЕТЕР ↑`, 32, 133);
+        ctx.font = `${Math.round(10*s)}px monospace`;
+        ctx.fillText(`ВЕТЕР ↑`, Math.round(32*s), Math.round(133*s));
         
         ctx.font = 'italic 12px monospace';
         ctx.fillStyle = "#f7e5c2";
         
         
         if (!gameRunning) {
-            ctx.font = 'bold 34px monospace';
+            ctx.font = `bold ${Math.round(34*s)}px monospace`;
             ctx.fillStyle = '#FFF3DF';
-            ctx.fillText('ПОКИНУЛ НЕБО', canvas.width / 2 - 150, canvas.height / 2 - 40);
-            ctx.font = '18px monospace';
+            ctx.fillText('ПОКИНУЛ НЕБО', canvas.width / 2 - Math.round(150*s), canvas.height / 2 - Math.round(40*s));
+            ctx.font = `${Math.round(18*s)}px monospace`;
             ctx.fillStyle = '#FFCF9A';
-            ctx.fillText('НАЖМИ ПРОБЕЛ / КЛИК / ТАП → НОВЫЙ ПОЛЁТ', canvas.width / 2 - 210, canvas.height / 2 + 40);
+            ctx.fillText('НАЖМИ ПРОБЕЛ / КЛИК / ТАП → НОВЫЙ ПОЛЁТ', canvas.width / 2 - Math.round(210*s), canvas.height / 2 + Math.round(40*s));
             
             // звезда на месте рекорда
             if (highScorePosition > 0) {
@@ -1331,8 +1452,8 @@ outer.addColorStop(0.6, 'rgba(255,180,110,0.1)');
         gameRunning = true;
         score = 0;
         player = {
-            x: canvas.width * 0.35,
-            y: canvas.height * 0.55,
+            x: LOGICAL_W * 0.35,
+            y: LOGICAL_H * 0.55,
             vx: 3.8,
             vy: 0,
             angle: 0,
@@ -1345,6 +1466,15 @@ outer.addColorStop(0.6, 'rgba(255,180,110,0.1)');
         windParticles = [];
         sparkParticles = [];
         isPressing = false;
+        diffLevel = 0;
+        THERMAL_GEN_RATE   = THERMAL_GEN_BASE;
+        THERMAL_MAX        = THERMAL_MAX_BASE;
+        DOWNDRAFT_GEN_RATE = DOWNDRAFT_GEN_BASE;
+        DOWNDRAFT_MAX      = DOWNDRAFT_MAX_BASE;
+        diffNoticeTimer    = 0;
+        windMilestoneIndex = 0;
+        windNoticeTimer    = 0;
+        MAX_VX_GROWTH      = Math.max(8, settingsMaxSpeed);
         initMountains();
         for (let i = 0; i < 2; i++) addThermalIfNeeded();
     }
@@ -1361,19 +1491,21 @@ outer.addColorStop(0.6, 'rgba(255,180,110,0.1)');
     }
 
     function getSliderHit(cx, cy) {
-        let px = canvas.width - 240;
-        let py = canvas.height / 2 - 60;
-        let pw = 210;
+        const s = UI_SCALE;
+        let px = canvas.width - Math.round(240 * s);
+        let py = canvas.height / 2 - Math.round(60 * s);
+        let pw = Math.round(210 * s);
         if (cx >= px - 10 && cx <= px + pw + 10) {
-            if (cy >= py + 16 && cy <= py + 44) return 'volume';
-            if (cy >= py + 82 && cy <= py + 110) return 'speed';
+            if (cy >= py + Math.round(16*s) && cy <= py + Math.round(44*s)) return 'volume';
+            if (cy >= py + Math.round(82*s) && cy <= py + Math.round(110*s)) return 'speed';
         }
         return null;
     }
 
     function applySliderDrag(slider, cx) {
-        let px = canvas.width - 240;
-        let pw = 210;
+        const s = UI_SCALE;
+        let px = canvas.width - Math.round(240 * s);
+        let pw = Math.round(210 * s);
         let t = Math.max(0, Math.min(1, (cx - px) / pw));
         if (slider === 'volume') {
             settingsVolume = t;
@@ -1443,6 +1575,8 @@ outer.addColorStop(0.6, 'rgba(255,180,110,0.1)');
     }
 
     //запуск
+    resizeCanvas();
+    window.addEventListener('resize', resizeCanvas);
     initMountains();
     bindControls();
 
