@@ -429,20 +429,45 @@
     let lastUpdate = 0;
 
     //звук
-    let audioCtx = null;
-    let windGain = null, windFilterHigh = null;
-    let windNode = null;
+    let audioCtx  = null;
     let audioReady = false;
 
-    function makeWindNode() {
-        // белый шум через ScriptProcessor — бесконечный поток случайных сэмплов
-        let bufferSize = 4096;
-        let node = audioCtx.createScriptProcessor(bufferSize, 1, 1);
-        node.onaudioprocess = function(e) {
-            let out = e.outputBuffer.getChannelData(0);
-            for (let i = 0; i < bufferSize; i++) out[i] = Math.random() * 2 - 1;
-        };
-        return node;
+    // ── Ветер ──────────────────────────────────────────────────────────────
+    let windGain        = null;  // итоговая громкость ветра
+    let windFilter1     = null;  // lowpass — "мягкость" (основной)
+    let windFilter2     = null;  // bandpass — "свист" (тихий слой)
+    let windNode        = null;
+
+    // ── Амбиент-слои (по биомам) ───────────────────────────────────────────
+    // Каждый слой: осциллятор + gain.  Активен только один набор за раз.
+    let ambLayers       = [];    // [{osc, gain, lfo, lfoGain}, ...]
+    let ambMasterGain   = null;
+    let ambCurrentBiom  = -1;   // id биома для которого запущен амбиент
+
+    // ── Розовый шум (1/f) — мягче белого ──────────────────────────────────
+    // Генерируем буфер один раз; AudioBufferSourceNode с loop
+    let pinkNode = null;
+
+    function makePinkBuffer() {
+        // 2 секунды розового шума при SR частоте
+        const sr     = audioCtx.sampleRate;
+        const len    = sr * 2;
+        const buf    = audioCtx.createBuffer(1, len, sr);
+        const data   = buf.getChannelData(0);
+        // алгоритм Voss–McCartney (простая аппроксимация 1/f)
+        let b0=0,b1=0,b2=0,b3=0,b4=0,b5=0,b6=0;
+        for (let i = 0; i < len; i++) {
+            const w = Math.random() * 2 - 1;
+            b0 = 0.99886*b0 + w*0.0555179;
+            b1 = 0.99332*b1 + w*0.0750759;
+            b2 = 0.96900*b2 + w*0.1538520;
+            b3 = 0.86650*b3 + w*0.3104856;
+            b4 = 0.55000*b4 + w*0.5329522;
+            b5 = -0.7616*b5 - w*0.0168980;
+            data[i] = (b0+b1+b2+b3+b4+b5+b6 + w*0.5362) / 9;
+            b6 = w * 0.115926;
+        }
+        return buf;
     }
 
     function initAudio() {
@@ -450,42 +475,191 @@
         try {
             audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 
-            // белый шум → bandpass (вырезает узкую полосу "свиста") → lowpass (срезает визг) → gain
-            windNode = makeWindNode();
+            // ── Ветер: розовый шум → lowpass (мягко) → bandpass (тихий свист) → gain ──
+            const pinkBuf = makePinkBuffer();
+            pinkNode = audioCtx.createBufferSource();
+            pinkNode.buffer = pinkBuf;
+            pinkNode.loop   = true;
 
-            // bandpass — даёт характерный "шелест" ветра
-            let bandpass = audioCtx.createBiquadFilter();
-            bandpass.type = 'bandpass';
-            bandpass.frequency.value = 600;
-            bandpass.Q.value = 0.8;
+            // Мягкий lowpass — срезает всё резкое выше 900 Гц
+            windFilter1 = audioCtx.createBiquadFilter();
+            windFilter1.type      = 'lowpass';
+            windFilter1.frequency.value = 420;   // начинаем очень мягко
+            windFilter1.Q.value   = 0.5;
 
-            // lowpass — убирает всё резкое сверху
-            windFilterHigh = audioCtx.createBiquadFilter();
-            windFilterHigh.type = 'lowpass';
-            windFilterHigh.frequency.value = 1200;
+            // Тихий bandpass — лёгкий намёк на "свист" воздуха
+            windFilter2 = audioCtx.createBiquadFilter();
+            windFilter2.type      = 'bandpass';
+            windFilter2.frequency.value = 520;
+            windFilter2.Q.value   = 1.2;
+
+            // Второй gain для bandpass-слоя (очень тихо)
+            const windBpGain = audioCtx.createGain();
+            windBpGain.gain.value = 0.18;
 
             windGain = audioCtx.createGain();
             windGain.gain.value = 0;
 
-            windNode.connect(bandpass);
-            bandpass.connect(windFilterHigh);
-            windFilterHigh.connect(windGain);
+            // Pink → lowpass → windGain  (основной тракт)
+            pinkNode.connect(windFilter1);
+            windFilter1.connect(windGain);
+
+            // Pink → bandpass → windBpGain → windGain  (свист поверх)
+            pinkNode.connect(windFilter2);
+            windFilter2.connect(windBpGain);
+            windBpGain.connect(windGain);
+
             windGain.connect(audioCtx.destination);
+            pinkNode.start();
+
+            // ── Амбиент: мастер-гейн ──
+            ambMasterGain = audioCtx.createGain();
+            ambMasterGain.gain.value = 0;
+            ambMasterGain.connect(audioCtx.destination);
 
             audioReady = true;
-        } catch(e) {}
+        } catch(e) { console.warn('Audio init failed:', e); }
+    }
+
+    // Параметры амбиент-слоёв для каждого биома
+    // layers: [{type, freq, detune, gainVal, lfoRate, lfoDepth}]
+    const BIOM_AMBIENT = {
+        dawn: {
+            masterGain: 0.09,
+            layers: [
+                { type:'sine',     freq: 110,  gainVal: 0.5,  lfoRate: 0.12, lfoDepth: 4   }, // низкий фон
+                { type:'sine',     freq: 220,  gainVal: 0.20, lfoRate: 0.07, lfoDepth: 6   }, // тёплая гармоника
+                { type:'triangle', freq: 330,  gainVal: 0.10, lfoRate: 0.19, lfoDepth: 3   }, // мягкий обертон
+            ]
+        },
+        day: {
+            masterGain: 0.07,
+            layers: [
+                { type:'sine',     freq: 130,  gainVal: 0.4,  lfoRate: 0.09, lfoDepth: 5   },
+                { type:'sine',     freq: 260,  gainVal: 0.18, lfoRate: 0.14, lfoDepth: 8   },
+                { type:'triangle', freq: 390,  gainVal: 0.08, lfoRate: 0.22, lfoDepth: 4   },
+                { type:'sine',     freq: 520,  gainVal: 0.05, lfoRate: 0.31, lfoDepth: 10  }, // яркий воздушный слой
+            ]
+        },
+        sunset: {
+            masterGain: 0.11,
+            layers: [
+                { type:'sine',     freq: 98,   gainVal: 0.55, lfoRate: 0.08, lfoDepth: 3   },
+                { type:'sine',     freq: 196,  gainVal: 0.22, lfoRate: 0.05, lfoDepth: 5   },
+                { type:'sawtooth', freq: 147,  gainVal: 0.06, lfoRate: 0.17, lfoDepth: 6   }, // тёплый "тягучий" тон
+                { type:'sine',     freq: 294,  gainVal: 0.08, lfoRate: 0.11, lfoDepth: 4   },
+            ]
+        },
+        dusk: {
+            masterGain: 0.13,
+            layers: [
+                { type:'sine',     freq: 82,   gainVal: 0.6,  lfoRate: 0.06, lfoDepth: 2   }, // глубокий бас
+                { type:'sine',     freq: 164,  gainVal: 0.25, lfoRate: 0.04, lfoDepth: 4   },
+                { type:'triangle', freq: 246,  gainVal: 0.12, lfoRate: 0.09, lfoDepth: 5   },
+                { type:'sine',     freq: 328,  gainVal: 0.07, lfoRate: 0.15, lfoDepth: 8   }, // мерцающий верх
+            ]
+        },
+        storm: {
+            masterGain: 0.16,
+            layers: [
+                { type:'sawtooth', freq: 55,   gainVal: 0.55, lfoRate: 0.18, lfoDepth: 8   }, // тяжёлый гул
+                { type:'sawtooth', freq: 110,  gainVal: 0.30, lfoRate: 0.23, lfoDepth: 12  },
+                { type:'square',   freq: 82,   gainVal: 0.12, lfoRate: 0.35, lfoDepth: 6   }, // резкое напряжение
+                { type:'sine',     freq: 165,  gainVal: 0.10, lfoRate: 0.27, lfoDepth: 10  },
+                { type:'sawtooth', freq: 220,  gainVal: 0.06, lfoRate: 0.40, lfoDepth: 15  }, // хаотичный верх
+            ]
+        },
+    };
+
+    function stopAmbLayers() {
+        const t = audioCtx.currentTime;
+        for (let L of ambLayers) {
+            try {
+                L.gain.gain.setTargetAtTime(0, t, 0.8);
+                L.osc.stop(t + 4);
+            } catch(e) {}
+        }
+        ambLayers = [];
+    }
+
+    function startAmbLayers(biomId) {
+        if (!audioReady) return;
+        stopAmbLayers();
+        const def = BIOM_AMBIENT[biomId];
+        if (!def) return;
+
+        const t = audioCtx.currentTime;
+        ambMasterGain.gain.setTargetAtTime(def.masterGain * settingsVolume, t, 2.5);
+
+        for (let L of def.layers) {
+            const osc     = audioCtx.createOscillator();
+            const gain    = audioCtx.createGain();
+            const lfo     = audioCtx.createOscillator();
+            const lfoGain = audioCtx.createGain();
+
+            osc.type             = L.type;
+            osc.frequency.value  = L.freq;
+            gain.gain.value      = 0;
+
+            // LFO — медленное вибрато частоты для "живости"
+            lfo.type             = 'sine';
+            lfo.frequency.value  = L.lfoRate;
+            lfoGain.gain.value   = L.lfoDepth;
+            lfo.connect(lfoGain);
+            lfoGain.connect(osc.frequency);
+
+            // Мягкий lowpass на каждом слое — убирает синтетический привкус
+            const lp = audioCtx.createBiquadFilter();
+            lp.type = 'lowpass';
+            lp.frequency.value = 800;
+            lp.Q.value = 0.4;
+
+            osc.connect(lp);
+            lp.connect(gain);
+            gain.connect(ambMasterGain);
+
+            osc.start(t);
+            lfo.start(t);
+            // плавный фейд-ин
+            gain.gain.setTargetAtTime(L.gainVal, t, 1.8);
+
+            ambLayers.push({ osc, gain, lfo, lfoGain });
+        }
+        ambCurrentBiom = biomId;
     }
 
     // обновляем шум ветра каждый кадр
     function updateWindSound() {
         if (!audioReady || !gameRunning) return;
         if (!isFinite(player.vx)) return;
-        let t = audioCtx.currentTime;
-        let speed = Math.max(0, Math.min(1, player.vx / MAX_VX_GROWTH));
-        // громкость растёт со скоростью
-        windGain.gain.setTargetAtTime((0.04 + speed * 0.13) * settingsVolume, t, 0.5);
-        // фильтр открывается на высокой скорости — ветер становится "острее"
-        windFilterHigh.frequency.setTargetAtTime(800 + speed * 1400, t, 0.5);
+        const t     = audioCtx.currentTime;
+        const speed = Math.max(0, Math.min(1, player.vx / MAX_VX_GROWTH));
+
+        // Громкость: тихо в начале, нарастает со скоростью
+        const targetGain = (0.025 + speed * 0.09) * settingsVolume;
+        windGain.gain.setTargetAtTime(targetGain, t, 0.6);
+
+        // Фильтр: на малой скорости — очень мягко (300 Гц), на макс — чуть открывается (900 Гц)
+        // Диапазон специально сужен чтобы ветер никогда не был резким
+        windFilter1.frequency.setTargetAtTime(300 + speed * 600, t, 0.8);
+        windFilter2.frequency.setTargetAtTime(400 + speed * 400, t, 0.8);
+
+        // Амбиент: переключаем слои при смене биома
+        const curBiomId = getCurBiom().id;
+        if (curBiomId !== ambCurrentBiom) {
+            startAmbLayers(curBiomId);
+        }
+        // Подстраиваем громкость амбиента под settingsVolume и сложность
+        if (ambMasterGain) {
+            const def = BIOM_AMBIENT[curBiomId];
+            if (def) {
+                // На шторме амбиент нарастает с диффлевелом
+                const diffBoost = curBiomId === 'storm' ? 1 + diffLevel * 0.04 : 1;
+                ambMasterGain.gain.setTargetAtTime(
+                    def.masterGain * settingsVolume * diffBoost, t, 1.5
+                );
+            }
+        }
     }
 
     // короткий звук термика — нарастающий свист вверх
@@ -1708,7 +1882,7 @@
             ctx.font = `bold ${Math.round(15*UI_SCALE)}px monospace`;
             ctx.fillStyle = `rgba(255, 230, 100, ${alpha})`;
             ctx.textAlign = 'center';
-            ctx.fillText(`⚡ ВЕТЕР КРЕПЧАЕТ — МАКС. ${windNoticeSpeed}`, LOGICAL_W / 2, LOGICAL_H / 2 - Math.round(55*UI_SCALE));
+            ctx.fillText(`ВЕТЕР КРЕПЧАЕТ — МАКС. ${windNoticeSpeed}`, LOGICAL_W / 2, LOGICAL_H / 2 - Math.round(55*UI_SCALE));
             ctx.textAlign = 'left';
             ctx.restore();
         }
