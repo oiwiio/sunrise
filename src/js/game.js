@@ -94,6 +94,314 @@
         { score: 30000, speed: 20 },
     ];
     let windMilestoneIndex = 0; // следующий не пройденный порог
+
+    // 
+    //  СИСТЕМА БИОМОВ
+    //  Каждый биом — полное визуальное состояние мира.
+    //  Переход между биомами плавный через biomTransition (0→1).
+    // 
+
+    const BIOMES = [
+        {
+            id: 'dawn',
+            name: 'РАССВЕТ',
+            scoreStart: 0,
+            sky: [
+                [0,    '#FF7A45'],
+                [0.35, '#C2547A'],
+                [0.65, '#784BA0'],
+                [1,    '#2B1F3D'],
+            ],
+            sun: { color0: '#fffef0', color1: '#ffe6b0', color2: '#ffbc60', color3: '#ff9028', glow: 'rgba(255,220,150,0.08)', rays: 'rgba(255,220,150,0.12)' },
+            farMtn:  '#3E2C49',
+            nearMtn: '#1D142B',
+            snowCap: 'rgba(255,245,235,0.55)',
+            cloudTop: 'rgba(255,255,255,0.92)',
+            cloudBot: 'rgba(230,235,245,0.72)',
+            cloudHL:  'rgba(255,220,170,0.28)',
+            thermalColor: 'rgba(255,215,150,1)',
+            trailColor:   'rgba(255,255,240,1)',
+            windColor:    'rgba(255,255,210,1)',
+            fogColor:     'rgba(255,160,100,0.10)',
+            particles: 'sparks',
+        },
+        {
+            id: 'day',
+            name: 'ДЕНЬ',
+            scoreStart: 6000,
+            sky: [
+                [0,    '#5BA8FF'],
+                [0.4,  '#3A7BD5'],
+                [0.75, '#1A4FA0'],
+                [1,    '#0D2B6B'],
+            ],
+            sun: { color0: '#ffffff', color1: '#fff4c2', color2: '#ffe680', color3: '#ffd230', glow: 'rgba(255,255,200,0.10)', rays: 'rgba(255,255,180,0.14)' },
+            farMtn:  '#2A4A7A',
+            nearMtn: '#172B50',
+            snowCap: 'rgba(255,255,255,0.75)',
+            cloudTop: 'rgba(255,255,255,0.95)',
+            cloudBot: 'rgba(220,235,255,0.80)',
+            cloudHL:  'rgba(255,255,255,0.40)',
+            thermalColor: 'rgba(180,220,255,1)',
+            trailColor:   'rgba(255,255,255,1)',
+            windColor:    'rgba(200,230,255,1)',
+            fogColor:     'rgba(100,160,255,0.07)',
+            particles: 'birds',
+        },
+        {
+            id: 'sunset',
+            name: 'ЗАКАТ',
+            scoreStart: 12000,
+            sky: [
+                [0,    '#FF4500'],
+                [0.3,  '#FF7C2A'],
+                [0.6,  '#C0392B'],
+                [1,    '#1a0a1e'],
+            ],
+            sun: { color0: '#fff0c0', color1: '#ffcc60', color2: '#ff8c00', color3: '#cc3300', glow: 'rgba(255,140,0,0.12)', rays: 'rgba(255,160,50,0.15)' },
+            farMtn:  '#5C1A2A',
+            nearMtn: '#2A0A15',
+            snowCap: 'rgba(255,200,150,0.50)',
+            cloudTop: 'rgba(255,220,180,0.90)',
+            cloudBot: 'rgba(200,120,80,0.70)',
+            cloudHL:  'rgba(255,160,60,0.45)',
+            thermalColor: 'rgba(255,140,50,1)',
+            trailColor:   'rgba(255,200,150,1)',
+            windColor:    'rgba(255,180,100,1)',
+            fogColor:     'rgba(200,80,30,0.13)',
+            particles: 'embers',
+        },
+        {
+            id: 'dusk',
+            name: 'СУМЕРКИ',
+            scoreStart: 18000,
+            sky: [
+                [0,    '#1A0533'],
+                [0.35, '#2D0F4A'],
+                [0.65, '#0F0820'],
+                [1,    '#050210'],
+            ],
+            sun: { color0: '#ffaacc', color1: '#cc88ff', color2: '#8844cc', color3: '#440088', glow: 'rgba(180,100,255,0.10)', rays: 'rgba(200,120,255,0.12)' },
+            farMtn:  '#1A0A2E',
+            nearMtn: '#0A0518',
+            snowCap: 'rgba(200,180,255,0.45)',
+            cloudTop: 'rgba(180,160,220,0.80)',
+            cloudBot: 'rgba(100,80,150,0.65)',
+            cloudHL:  'rgba(200,150,255,0.35)',
+            thermalColor: 'rgba(180,100,255,1)',
+            trailColor:   'rgba(200,180,255,1)',
+            windColor:    'rgba(180,150,255,1)',
+            fogColor:     'rgba(100,50,200,0.11)',
+            particles: 'stars',
+        },
+        {
+            id: 'storm',
+            name: 'БУРЯ',
+            scoreStart: 24000,
+            sky: [
+                [0,    '#1A1A2E'],
+                [0.3,  '#16213E'],
+                [0.6,  '#0F0F23'],
+                [1,    '#050508'],
+            ],
+            sun: { color0: '#c0d8ff', color1: '#8ab0e0', color2: '#4060a0', color3: '#1a3060', glow: 'rgba(100,150,255,0.06)', rays: 'rgba(120,160,255,0.08)' },
+            farMtn:  '#12182A',
+            nearMtn: '#080C18',
+            snowCap: 'rgba(180,200,255,0.35)',
+            cloudTop: 'rgba(100,120,160,0.85)',
+            cloudBot: 'rgba(40,50,80,0.75)',
+            cloudHL:  'rgba(150,180,255,0.20)',
+            thermalColor: 'rgba(100,160,255,1)',
+            trailColor:   'rgba(150,200,255,1)',
+            windColor:    'rgba(100,150,255,1)',
+            fogColor:     'rgba(30,50,120,0.17)',
+            particles: 'lightning',
+        },
+    ];
+
+    let biomIndex      = 0;
+    let biomTransition = 1; // 1 = полностью в текущем биоме
+    let biomNoticeTimer = 0;
+    let biomNoticeName  = '';
+    let biomParticles   = [];
+
+    function lerp(a, b, t) { return a + (b - a) * t; }
+
+    function parseColor(c) {
+        c = c.trim();
+        if (c[0] === '#') {
+            return [parseInt(c.slice(1,3),16), parseInt(c.slice(3,5),16), parseInt(c.slice(5,7),16), 1];
+        }
+        let m = c.match(/[\d.]+/g).map(Number);
+        return [m[0], m[1], m[2], m[3] !== undefined ? m[3] : 1];
+    }
+
+    function lerpColor(c1, c2, t) {
+        let a = parseColor(c1), b = parseColor(c2);
+        let r  = Math.round(lerp(a[0],b[0],t));
+        let g  = Math.round(lerp(a[1],b[1],t));
+        let bl = Math.round(lerp(a[2],b[2],t));
+        let al = lerp(a[3],b[3],t);
+        return `rgba(${r},${g},${bl},${al.toFixed(3)})`;
+    }
+
+    function getCurBiom()  { return BIOMES[biomIndex]; }
+    function getNextBiom() { return BIOMES[Math.min(biomIndex+1, BIOMES.length-1)]; }
+    function biomT()       { return 1 - biomTransition; } // 0=cur, 1=next
+
+    // Конвертирует любой цвет (hex или rgba) в rgba-строку
+    function toRgba(c, overrideAlpha) {
+        let p = parseColor(c);
+        let a = overrideAlpha !== undefined ? overrideAlpha : p[3];
+        return `rgba(${p[0]},${p[1]},${p[2]},${a.toFixed(3)})`;
+    }
+    // Возвращает rgba-строку биом-цвета с заменённой прозрачностью
+    function biomColorA(key, alpha) {
+        return toRgba(biomColor(key), alpha);
+    }
+    function biomSunPropA(key, alpha) {
+        return toRgba(biomSunProp(key), alpha);
+    }
+
+    function biomColor(key) {
+        let cur = getCurBiom()[key], nxt = getNextBiom()[key];
+        if (biomTransition >= 1 || cur === nxt) return cur;
+        return lerpColor(cur, nxt, biomT());
+    }
+
+    function biomSkyStops() {
+        let cur = getCurBiom().sky, nxt = getNextBiom().sky;
+        if (biomTransition >= 1) return cur;
+        return cur.map((s, i) => [s[0], lerpColor(s[1], (nxt[i]||s)[1], biomT())]);
+    }
+
+    function biomSunProp(key) {
+        let cur = getCurBiom().sun[key], nxt = getNextBiom().sun[key];
+        if (biomTransition >= 1) return cur;
+        return lerpColor(cur, nxt, biomT());
+    }
+
+    function updateBiom() {
+        let target = 0;
+        for (let i = BIOMES.length - 1; i >= 0; i--) {
+            if (score >= BIOMES[i].scoreStart) { target = i; break; }
+        }
+        if (target !== biomIndex) {
+            biomIndex = target;
+            biomTransition = 0;
+            biomNoticeName  = BIOMES[biomIndex].name;
+            biomNoticeTimer = 260;
+            biomParticles   = [];
+        }
+        if (biomTransition < 1) biomTransition = Math.min(1, biomTransition + 0.004);
+        updateBiomParticles();
+    }
+
+    function spawnBiomParticle() {
+        const type = getCurBiom().particles;
+        if (type === 'sparks') {
+            biomParticles.push({ type:'spark', x: LOGICAL_W+Math.random()*200, y: Math.random()*LOGICAL_H*0.7,
+                vx:-(1.5+Math.random()*3), vy:(Math.random()-0.5)*0.8,
+                life:1, decay:0.005+Math.random()*0.006,
+                size:1+Math.random()*2.5, hue:30+Math.random()*30 });
+        } else if (type === 'birds') {
+            biomParticles.push({ type:'bird', x: LOGICAL_W+Math.random()*300, y: 60+Math.random()*LOGICAL_H*0.45,
+                vx:-(1.2+Math.random()*2), vy:(Math.random()-0.5)*0.4,
+                life:1, decay:0.003+Math.random()*0.003,
+                size:3+Math.random()*3, flap:Math.random()*Math.PI*2 });
+        } else if (type === 'embers') {
+            biomParticles.push({ type:'ember', x: LOGICAL_W+Math.random()*150, y: LOGICAL_H*0.3+Math.random()*LOGICAL_H*0.5,
+                vx:-(0.8+Math.random()*2), vy:-(0.5+Math.random()*1.5),
+                life:1, decay:0.007+Math.random()*0.008,
+                size:1.5+Math.random()*3, wobble:Math.random()*Math.PI*2 });
+        } else if (type === 'stars' && biomParticles.length < 60) {
+            biomParticles.push({ type:'star', x: Math.random()*LOGICAL_W, y: Math.random()*LOGICAL_H*0.6,
+                vx:0, vy:0, life:Math.random(), decay:0,
+                size:0.8+Math.random()*2, twinkle:Math.random()*Math.PI*2 });
+        } else if (type === 'lightning' && Math.random() < 0.003) {
+            biomParticles.push({ type:'lightning', x: Math.random()*LOGICAL_W, y:0,
+                vx:0, vy:0, life:1, decay:0.14, size:2,
+                segs: Array.from({length:8}, (_,i) => ({ dx:(Math.random()-0.5)*45, dy:LOGICAL_H*0.12 })) });
+        }
+    }
+
+    function updateBiomParticles() {
+        const type = getCurBiom().particles;
+        if (type==='sparks'  && Math.random()<0.22) spawnBiomParticle();
+        if (type==='birds'   && Math.random()<0.04) spawnBiomParticle();
+        if (type==='embers'  && Math.random()<0.18) spawnBiomParticle();
+        if (type==='stars')  spawnBiomParticle();
+        if (type==='lightning') spawnBiomParticle();
+
+        for (let i = biomParticles.length-1; i >= 0; i--) {
+            let p = biomParticles[i];
+            if (p.type === 'star') {
+                p.twinkle += 0.04;
+                p.life = 0.3 + Math.sin(p.twinkle)*0.3;
+                if (type !== 'stars') { biomParticles.splice(i,1); continue; }
+            } else {
+                p.x += p.vx; p.y += p.vy;
+                if (p.type==='ember')  { p.vy -= 0.018; p.wobble += 0.08; p.x += Math.sin(p.wobble)*0.5; }
+                if (p.type==='bird')   { p.flap += 0.18; }
+                p.life -= p.decay;
+            }
+            if (p.life <= 0 || p.x < -100) biomParticles.splice(i,1);
+        }
+    }
+
+    function drawBiomParticles(camY) {
+        for (let p of biomParticles) {
+            const al = Math.max(0, p.life);
+            ctx.save();
+            ctx.globalAlpha = al;
+            if (p.type === 'spark') {
+                let col = `hsl(${p.hue},100%,${70+p.life*20}%)`;
+                ctx.fillStyle = col; ctx.shadowBlur = 7; ctx.shadowColor = col;
+                ctx.beginPath(); ctx.arc(p.x, p.y, p.size, 0, Math.PI*2); ctx.fill();
+            } else if (p.type === 'bird') {
+                ctx.strokeStyle = `rgba(120,170,230,${al*0.75})`; ctx.lineWidth = 1.3;
+                let flap = Math.sin(p.flap)*p.size*0.9;
+                ctx.beginPath();
+                ctx.moveTo(p.x - p.size, p.y - flap);
+                ctx.quadraticCurveTo(p.x, p.y - p.size*0.4, p.x + p.size, p.y - flap);
+                ctx.stroke();
+            } else if (p.type === 'ember') {
+                ctx.fillStyle = `hsl(${15+Math.random()*20},100%,${50+al*30}%)`;
+                ctx.shadowBlur = 9; ctx.shadowColor = '#ff6600';
+                ctx.beginPath(); ctx.arc(p.x, p.y, p.size*al, 0, Math.PI*2); ctx.fill();
+            } else if (p.type === 'star') {
+                ctx.fillStyle = '#fff'; ctx.shadowBlur = 5; ctx.shadowColor = 'rgba(200,200,255,0.8)';
+                ctx.beginPath(); ctx.arc(p.x, p.y, p.size, 0, Math.PI*2); ctx.fill();
+            } else if (p.type === 'lightning') {
+                ctx.strokeStyle = `rgba(180,210,255,${al})`; ctx.lineWidth = 1.5;
+                ctx.shadowBlur = 14; ctx.shadowColor = 'rgba(150,200,255,0.9)';
+                ctx.beginPath();
+                let lx = p.x, ly = 0; ctx.moveTo(lx, ly);
+                for (let seg of p.segs) { lx += seg.dx; ly += seg.dy; ctx.lineTo(lx, ly); }
+                ctx.stroke();
+            }
+            ctx.restore();
+        }
+    }
+
+    function drawBiomNotice() {
+        if (biomNoticeTimer <= 0) return;
+        biomNoticeTimer--;
+        const fadeIn  = Math.min(1, (260 - biomNoticeTimer) / 30);
+        const fadeOut = Math.min(1, biomNoticeTimer / 50);
+        const alpha   = Math.min(fadeIn, fadeOut);
+        const s = UI_SCALE;
+        ctx.save();
+        ctx.globalAlpha = alpha;
+        ctx.font = `bold ${Math.round(22*s)}px monospace`;
+        ctx.fillStyle = '#fff';
+        ctx.textAlign = 'center';
+        ctx.shadowBlur = 18; ctx.shadowColor = 'rgba(255,200,100,0.7)';
+        ctx.fillText(`— ${biomNoticeName} —`, LOGICAL_W/2, LOGICAL_H/2 - Math.round(110*s));
+        ctx.textAlign = 'left';
+        ctx.restore();
+    }
+
     
     let mountainSegments = [];
     const segmentWidth = 210;
@@ -644,6 +952,7 @@
         addCloudIfNeeded();
         
         updateDifficulty();
+        updateBiom();
 
         // счёт
         let isMaxSpeed = (player.vx > MAX_VX_GROWTH - 0.8);
@@ -677,19 +986,19 @@
     // привественный экран
     function drawWelcomeScreen() {
         // тёмный градиентный фон
-        let grad = ctx.createLinearGradient(0, 0, 0, canvas.height);
+        let grad = ctx.createLinearGradient(0, 0, 0, LOGICAL_H);
         grad.addColorStop(0, '#2B1F3D');
         grad.addColorStop(1, '#0a0c14');
         ctx.fillStyle = grad;
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.fillRect(0, 0, LOGICAL_W, LOGICAL_H);
         
         // рассветное солнце
         ctx.beginPath();
-        ctx.arc(canvas.width - 60, 70, 38, 0, Math.PI * 2);
+        ctx.arc(LOGICAL_W - 60, 70, 38, 0, Math.PI * 2);
         ctx.fillStyle = '#FFA471';
         ctx.fill();
         ctx.beginPath();
-        ctx.arc(canvas.width - 60, 70, 28, 0, Math.PI * 2);
+        ctx.arc(LOGICAL_W - 60, 70, 28, 0, Math.PI * 2);
         ctx.fillStyle = '#FFD89C';
         ctx.fill();
         
@@ -698,10 +1007,10 @@
         for (let i = 0; i < 5; i++) {
             let x = i * 180 - (frame * 0.3) % 180;
             ctx.beginPath();
-            ctx.moveTo(x, canvas.height);
-            ctx.lineTo(x + 60, canvas.height - 40);
-            ctx.lineTo(x + 120, canvas.height - 20);
-            ctx.lineTo(x + 180, canvas.height);
+            ctx.moveTo(x, LOGICAL_H);
+            ctx.lineTo(x + 60, LOGICAL_H - 40);
+            ctx.lineTo(x + 120, LOGICAL_H - 20);
+            ctx.lineTo(x + 180, LOGICAL_H);
             ctx.fill();
         }
         
@@ -711,40 +1020,40 @@
         ctx.fillStyle = '#FFF9E8';
         ctx.shadowBlur = 8;
         ctx.shadowColor = 'rgba(0,0,0,0.5)';
-        ctx.fillText('SUNRISE', canvas.width / 2 - Math.round(130*s), canvas.height / 2 - Math.round(80*s));
+        ctx.fillText('SUNRISE', LOGICAL_W / 2 - Math.round(130*s), LOGICAL_H / 2 - Math.round(80*s));
         ctx.shadowBlur = 0;
         
         // подзаголовок
         ctx.font = `${Math.round(18*s)}px monospace`;
         ctx.fillStyle = '#FFD6A5';
-        ctx.fillText('', canvas.width / 2 - Math.round(85*s), canvas.height / 2 - Math.round(30*s));
+        ctx.fillText('', LOGICAL_W / 2 - Math.round(85*s), LOGICAL_H / 2 - Math.round(30*s));
         
         // описание управления
         ctx.font = `${Math.round(14*s)}px monospace`;
         ctx.fillStyle = '#ffd9b5';
-        ctx.fillText('ЗАЖМИ — ПИКИРУЙ', canvas.width / 2 - Math.round(100*s), canvas.height / 2 + Math.round(40*s));
-        ctx.fillText('ОТПУСТИ — ПАРИ', canvas.width / 2 - Math.round(90*s), canvas.height / 2 + Math.round(68*s));
+        ctx.fillText('ЗАЖМИ — ПИКИРУЙ', LOGICAL_W / 2 - Math.round(100*s), LOGICAL_H / 2 + Math.round(40*s));
+        ctx.fillText('ОТПУСТИ — ПАРИ', LOGICAL_W / 2 - Math.round(90*s), LOGICAL_H / 2 + Math.round(68*s));
         
         // подсказка для мобильных
-        ctx.fillText('ПОВЕРНИТЕ ТЕЛЕФОН', canvas.width / 2 - Math.round(100*s), canvas.height / 2 + Math.round(105*s));
-        ctx.fillText('ДЛЯ КОМФОРТНОЙ ИГРЫ', canvas.width / 2 - Math.round(100*s), canvas.height / 2 + Math.round(125*s));
+        ctx.fillText('ПОВЕРНИТЕ ТЕЛЕФОН', LOGICAL_W / 2 - Math.round(100*s), LOGICAL_H / 2 + Math.round(105*s));
+        ctx.fillText('ДЛЯ КОМФОРТНОЙ ИГРЫ', LOGICAL_W / 2 - Math.round(100*s), LOGICAL_H / 2 + Math.round(125*s));
     
         // визуальная подсказка
         ctx.font = `bold ${Math.round(18*s)}px monospace`;
         ctx.fillStyle = '#FFCF9A';
-        ctx.fillText('--> ЛЮБОЕ НАЖАТИЕ <--', canvas.width / 2 - Math.round(110*s), canvas.height / 2 + Math.round(165*s));
+        ctx.fillText('--> ЛЮБОЕ НАЖАТИЕ <--', LOGICAL_W / 2 - Math.round(110*s), LOGICAL_H / 2 + Math.round(165*s));
         
         // рекорд
         if (highScore > 0) {
             ctx.font = `${Math.round(13*s)}px monospace`;
             ctx.fillStyle = '#c9b28b';
-            ctx.fillText(`лучший полёт: ${highScore} ✦`, canvas.width / 2 - Math.round(80*s), canvas.height - Math.round(60*s));
+            ctx.fillText(`лучший полёт: ${highScore} ✦`, LOGICAL_W / 2 - Math.round(80*s), LOGICAL_H - Math.round(60*s));
         }
 
         
         // парящие частицы
         for (let i = 0; i < 12; i++) {
-            let x = (frame * 0.2 + i * 37) % (canvas.width + 100) - 50;
+            let x = (frame * 0.2 + i * 37) % (LOGICAL_W + 100) - 50;
             let y = 80 + Math.sin(frame * 0.02 + i) * 25;
             ctx.fillStyle = `rgba(255, 215, 150, ${0.2 + Math.sin(frame * 0.05 + i) * 0.1})`;
             ctx.beginPath();
@@ -783,8 +1092,8 @@
     function drawSettingsPanel() {
         const s = UI_SCALE;
         let pw = Math.round(210 * s);
-        let px = canvas.width - Math.round(248 * s);
-        let py = canvas.height / 2 - Math.round(60 * s);
+        let px = LOGICAL_W - Math.round(248 * s);
+        let py = LOGICAL_H / 2 - Math.round(60 * s);
 
         // подложка
         ctx.fillStyle = 'rgba(10, 12, 20, 0.6)';
@@ -832,7 +1141,7 @@
         const screenX = highScorePosition - cameraX;
         
         // Не рисуем, если флаг далеко за пределами экрана
-        if (screenX < -50 || screenX > canvas.width + 50) return;
+        if (screenX < -50 || screenX > LOGICAL_W + 50) return;
         
         // древко флага
         ctx.beginPath();
@@ -874,22 +1183,37 @@
     
     //отрисовка
     function draw() {
+        // Сбрасываем трансформ в начале каждого кадра — гарантирует правильный DPR-масштаб
+        // даже если предыдущий save/restore где-то нарушил стек
+        const _DPR = window.devicePixelRatio || 1;
+        ctx.setTransform(_DPR, 0, 0, _DPR, 0, 0);
+        // Сбрасываем состояние контекста между кадрами
+        ctx.globalAlpha = 1;
+        ctx.shadowBlur = 0;
+        ctx.shadowColor = 'transparent';
+        ctx.globalCompositeOperation = 'source-over';
+        frame++;
+
         // если показываем приветственный экран — рисуем его и выходим
         if (showWelcome) {
             drawWelcomeScreen();
-            frame++;
             return;
         }
         
         const camY = getCameraY();
         
-        //небо
-        let grad = ctx.createLinearGradient(0, 0, 0, canvas.height);
-        grad.addColorStop(0, '#FFA471');
-        grad.addColorStop(0.62, '#784BA0');
-        grad.addColorStop(1, '#2B1F3D');
+        //небо — биом
+        let grad = ctx.createLinearGradient(0, 0, 0, LOGICAL_H);
+        for (let _s of biomSkyStops()) grad.addColorStop(_s[0], _s[1]);
         ctx.fillStyle = grad;
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.fillRect(0, 0, LOGICAL_W, LOGICAL_H);
+
+        // туман у горизонта (биомный)
+        let _fogGrad = ctx.createLinearGradient(0, LOGICAL_H*0.55, 0, LOGICAL_H);
+        _fogGrad.addColorStop(0, 'rgba(0,0,0,0)');
+        _fogGrad.addColorStop(1, biomColor('fogColor'));
+        ctx.fillStyle = _fogGrad;
+        ctx.fillRect(0, LOGICAL_H*0.55, LOGICAL_W, LOGICAL_H*0.45);
 
         //граница
         ctx.strokeStyle = 'rgba(255,255,255,0.15)';
@@ -897,34 +1221,40 @@
 
         ctx.beginPath();
         ctx.moveTo(0, 32 - camY);
-        ctx.lineTo(canvas.width, 32 - camY);
+        ctx.lineTo(LOGICAL_W, 32 - camY);
         ctx.stroke();
 
         ctx.fillStyle = 'rgba(255,255,255,0.4)';
         ctx.font = '12px monospace';
-        if (24 - camY > 20 && 24 - camY < canvas.height - 20) {
-            ctx.fillText('ПРЕДЕЛ ВЫСОТЫ', canvas.width - 160, 24 - camY);
+        if (24 - camY > 20 && 24 - camY < LOGICAL_H - 20) {
+            ctx.fillText('ПРЕДЕЛ ВЫСОТЫ', LOGICAL_W - 160, 24 - camY);
         }
         
     //солнце
-    let sunX = canvas.width - 90;
+    let sunX = LOGICAL_W - 90;
     let sunY = 78;
 
     let pulse = 0.95 + Math.sin(frame * 0.03) * 0.05;
     let rayRotation = frame * 0.01;
     let rayRotation2 = -frame * 0.006;
 
-    //атмосферное свечение (бледнее)
+    //атмосферное свечение (биом)
     let atmosphere = ctx.createRadialGradient(sunX, sunY, 20, sunX, sunY, 180);
-    atmosphere.addColorStop(0, 'rgba(255,220,150,0.08)');   
-    atmosphere.addColorStop(0.5, 'rgba(255,170,90,0.04)'); 
-    atmosphere.addColorStop(1, 'rgba(255,120,50,0)');
+    atmosphere.addColorStop(0, biomSunProp('glow'));
+    atmosphere.addColorStop(0.5, 'rgba(0,0,0,0)');
+    atmosphere.addColorStop(1, 'rgba(0,0,0,0)');
     ctx.fillStyle = atmosphere;
     ctx.beginPath();
     ctx.arc(sunX, sunY, 180, 0, Math.PI * 2);
     ctx.fill();
 
     //лучи
+    // лучи солнца — цвет вычисляем один раз за пределами обоих циклов
+    const _raysBase = biomSunProp('rays');
+    function _rayColor(alpha) {
+        return toRgba(_raysBase, alpha);
+    }
+
     ctx.save();
     ctx.translate(sunX, sunY);
     ctx.rotate(rayRotation);
@@ -937,14 +1267,14 @@
         ctx.moveTo(30, 0);
         ctx.lineTo(len, -5);
         ctx.lineTo(len, 5);
-        ctx.fillStyle = `rgba(255,220,150,${0.1 + Math.sin(frame * 0.02 + i) * 0.05})`;
+        ctx.fillStyle = _rayColor(0.1 + Math.sin(frame * 0.02 + i) * 0.05);
         ctx.fill();
         ctx.restore();
     }
     ctx.restore();
 
-    //лучи
-    ctx.save(); 
+    //лучи (второй набор, медленнее)
+    ctx.save();
     ctx.translate(sunX, sunY);
     ctx.rotate(rayRotation2);
     for (let i = 0; i < 6; i++) {
@@ -956,17 +1286,17 @@
         ctx.moveTo(22, 0);
         ctx.lineTo(len, -3);
         ctx.lineTo(len, 3);
-        ctx.fillStyle = `rgba(255,245,200,${0.12 + Math.sin(frame * 0.03 + i) * 0.04})`;
+        ctx.fillStyle = _rayColor(0.12 + Math.sin(frame * 0.03 + i) * 0.04);
         ctx.fill();
         ctx.restore();
     }
-        ctx.restore();
+    ctx.restore();
 
     //внешний ореол
     let outer = ctx.createRadialGradient(sunX, sunY, 10, sunX, sunY, 85);
-    outer.addColorStop(0, 'rgba(255,235,180,0.35)'); 
-    outer.addColorStop(0.6, 'rgba(255,180,110,0.1)');
-    outer.addColorStop(1, 'rgba(255,140,80,0)');
+    outer.addColorStop(0,   biomSunPropA('color1', 0.35));
+    outer.addColorStop(0.6, biomSunPropA('color2', 0.10));
+    outer.addColorStop(1,   'rgba(0,0,0,0)');
     ctx.fillStyle = outer;
     ctx.beginPath();
     ctx.arc(sunX, sunY, 85 * pulse, 0, Math.PI * 2);
@@ -974,10 +1304,10 @@
     
     //ядро солнца
     let core = ctx.createRadialGradient(sunX - 5, sunY - 5, 0, sunX, sunY, 38);
-    core.addColorStop(0, '#fffef0');   
-    core.addColorStop(0.25, '#ffe6b0');   
-    core.addColorStop(0.7, '#ffbc60');    
-    core.addColorStop(1, '#ff9028');      
+    core.addColorStop(0,    biomSunProp('color0'));
+    core.addColorStop(0.25, biomSunProp('color1'));
+    core.addColorStop(0.7,  biomSunProp('color2'));
+    core.addColorStop(1,    biomSunProp('color3'));      
     ctx.fillStyle = core;
     ctx.beginPath();
     ctx.arc(sunX, sunY, 34 * pulse, 0, Math.PI * 2);
@@ -1011,16 +1341,16 @@
         ctx.fill();
     }
         
-    //дальние горы
-    ctx.fillStyle = '#3E2C49';
+    //дальние горы — биом
+    ctx.fillStyle = biomColor('farMtn');
 
     for (let seg of mountainSegments) {
         let screenX = seg.x - cameraX;
         let y = seg.y - camY;
 
-        if (screenX + segmentWidth > -50 && screenX < canvas.width + 100) { 
+        if (screenX + segmentWidth > -50 && screenX < LOGICAL_W + 100) {
             ctx.beginPath();
-            ctx.moveTo(screenX, canvas.height);
+            ctx.moveTo(screenX, LOGICAL_H);
             ctx.lineTo(screenX, y - 20);
 
             ctx.quadraticCurveTo(
@@ -1039,22 +1369,22 @@
                 screenX + segmentWidth * 0.92,y - 10,
                 screenX + segmentWidth,y - 14
             );
-            ctx.lineTo(screenX + segmentWidth, canvas.height);
+            ctx.lineTo(screenX + segmentWidth, LOGICAL_H);
             ctx.fill();
         }
         }
 
 
-    //ближние горы
-    ctx.fillStyle = '#1D142B';
+    //ближние горы — биом
+    ctx.fillStyle = biomColor('nearMtn');
 
     for (let seg of mountainSegments) {
         let screenX = seg.x - cameraX;
         let y = seg.y - camY;
 
-        if (screenX + segmentWidth > -50 && screenX < canvas.width + 100) {
+        if (screenX + segmentWidth > -50 && screenX < LOGICAL_W + 100) {
             ctx.beginPath();
-            ctx.moveTo(screenX, canvas.height);
+            ctx.moveTo(screenX, LOGICAL_H);
             ctx.lineTo(screenX, y);
             ctx.quadraticCurveTo(
                 screenX + segmentWidth * 0.15,y - 20,
@@ -1072,8 +1402,19 @@
                 screenX + segmentWidth * 0.82,y - 20,
                 screenX + segmentWidth,y - 6
             );
-            ctx.lineTo(screenX + segmentWidth, canvas.height);
+            ctx.lineTo(screenX + segmentWidth, LOGICAL_H);
             ctx.fill();
+
+            // снежная шапка (биом)
+            ctx.save();
+            ctx.fillStyle = biomColor('snowCap');
+            ctx.beginPath();
+            ctx.moveTo(screenX, y);
+            ctx.quadraticCurveTo(screenX + segmentWidth*0.38, y - 34, screenX + segmentWidth*0.45, y - 24);
+            ctx.quadraticCurveTo(screenX + segmentWidth*0.45, y - 14, screenX + segmentWidth*0.38, y - 10);
+            ctx.quadraticCurveTo(screenX + segmentWidth*0.20, y - 6, screenX, y);
+            ctx.fill();
+            ctx.restore();
         }
     }
 
@@ -1107,8 +1448,8 @@
             
             // основное тело облака (градиент)
             let body = ctx.createLinearGradient(x, y - h, x, y + h);
-            body.addColorStop(0, 'rgba(255, 255, 255, 0.92)');
-            body.addColorStop(1, 'rgba(230, 235, 245, 0.72)');
+            body.addColorStop(0, biomColor('cloudTop'));
+            body.addColorStop(1, biomColor('cloudBot'));
             ctx.fillStyle = body;
             ctx.beginPath();
             ctx.arc(x - w * 0.42, y, h * 0.46, 0, Math.PI * 2);
@@ -1119,8 +1460,8 @@
             
             // рассветная подсветка сверху
             let highlight = ctx.createLinearGradient(x, y - h, x, y);
-            highlight.addColorStop(0, 'rgba(255, 220, 170, 0.28)');
-            highlight.addColorStop(1, 'rgba(255, 220, 170, 0)');
+            highlight.addColorStop(0, biomColorA('cloudHL', parseColor(biomColor('cloudHL'))[3]));
+            highlight.addColorStop(1, biomColorA('cloudHL', 0));
             ctx.fillStyle = highlight;
             ctx.beginPath();
             ctx.arc(x - w * 0.15, y - h * 0.2, h * 0.28, 0, Math.PI * 2);
@@ -1144,7 +1485,7 @@
             ctx.beginPath();
             let pulseScale = 0.85 + Math.sin(frame * 0.025 + t.pulse) * 0.1;
             ctx.arc(screenX, screenY, t.radius * pulseScale, 0, Math.PI * 2);
-            ctx.fillStyle = `rgba(255, 215, 150, ${0.24 + Math.sin(Date.now() * 0.005) * 0.08})`;
+            ctx.fillStyle = biomColorA('thermalColor', 0.24+Math.sin(Date.now()*0.005)*0.08);
             ctx.fill();
         }
         
@@ -1167,7 +1508,7 @@
         if (isMaxSpeed) {
             ctx.font = 'bold 11px monospace';
             ctx.fillStyle = '#FFD966';
-            ctx.fillText(' MAX SPEED ', canvas.width - 130, 58);
+            ctx.fillText(' MAX SPEED ', LOGICAL_W - 130, 58);
         }
 
         // тонкий след от параплана (конденсация)
@@ -1193,10 +1534,13 @@
                 ctx.beginPath();
                 ctx.moveTo(screenX1, screenY1);
                 ctx.lineTo(screenX2, screenY2);
-                ctx.strokeStyle = `rgba(255, 255, 240, ${opacity})`;
+                ctx.strokeStyle = biomColorA('trailColor', opacity);
                 ctx.stroke();
             }
         }
+
+        // частицы биома (птицы, угли, звёзды, молнии)
+        drawBiomParticles(camY);
 
         // линии ветра
         for (let p of windParticles) {
@@ -1204,12 +1548,13 @@
             ctx.moveTo(p.x, p.y);
             ctx.lineTo(p.x - p.length, p.y - p.vy * 2);
             ctx.lineWidth = p.width;
-            ctx.strokeStyle = `rgba(255, 255, 210, ${p.life * p.opacity * 0.6})`;
+            ctx.strokeStyle = biomColorA('windColor', p.life*p.opacity*0.6);
             ctx.stroke();
         }
 
     //игрок
     ctx.save();
+    ctx.shadowBlur = 0; // сброс перед игроком
     ctx.translate(player.x - cameraX, player.y - camY);
     ctx.rotate(player.angle);
 
@@ -1319,22 +1664,26 @@
     ctx.restore();
 
         // искры (жёлтые, синие, облачные)
-        for (let s of sparkParticles) {
+        for (let sp of sparkParticles) {
             let color;
-            if (s.isCloud) {
-                color = `rgba(240, 248, 255, ${s.life * 0.8})`;
-            } else if (s.isNegative) {
-                color = `rgba(100, 150, 200, ${s.life * 0.9})`;
+            if (sp.isCloud) {
+                color = `rgba(240, 248, 255, ${sp.life * 0.8})`;
+            } else if (sp.isNegative) {
+                color = `rgba(100, 150, 200, ${sp.life * 0.9})`;
             } else {
-                color = `rgba(255, 220, 140, ${s.life * 0.9})`;
+                color = `rgba(255, 220, 140, ${sp.life * 0.9})`;
             }
             ctx.fillStyle = color;
             ctx.beginPath();
-            ctx.arc(s.x, s.y, s.size * 0.7, 0, Math.PI * 2);
+            ctx.arc(sp.x, sp.y, sp.size * 0.7, 0, Math.PI * 2);
             ctx.fill();
         }
 
-        //ui
+        //ui — сбрасываем ctx-состояние перед HUD чтобы тени и alpha не текли
+        ctx.save();
+        ctx.shadowBlur = 0;
+        ctx.shadowColor = 'transparent';
+        ctx.globalAlpha = 1;
         const s = UI_SCALE;
         if (diffNoticeTimer > 0) {
             diffNoticeTimer--;
@@ -1346,7 +1695,7 @@
             ctx.font = `bold ${Math.round(16*UI_SCALE)}px monospace`;
             ctx.fillStyle = 'rgba(255, 160, 80, ' + alpha + ')';
             ctx.textAlign = 'center';
-            ctx.fillText(msgs[diffNoticeLevel] || '', canvas.width / 2, canvas.height / 2 - 80);
+            ctx.fillText(msgs[diffNoticeLevel] || '', LOGICAL_W / 2, LOGICAL_H / 2 - 80);
             ctx.textAlign = 'left';
             ctx.restore();
         }
@@ -1359,7 +1708,7 @@
             ctx.font = `bold ${Math.round(15*UI_SCALE)}px monospace`;
             ctx.fillStyle = `rgba(255, 230, 100, ${alpha})`;
             ctx.textAlign = 'center';
-            ctx.fillText(`⚡ ВЕТЕР КРЕПЧАЕТ — МАКС. ${windNoticeSpeed}`, canvas.width / 2, canvas.height / 2 - Math.round(55*UI_SCALE));
+            ctx.fillText(`⚡ ВЕТЕР КРЕПЧАЕТ — МАКС. ${windNoticeSpeed}`, LOGICAL_W / 2, LOGICAL_H / 2 - Math.round(55*UI_SCALE));
             ctx.textAlign = 'left';
             ctx.restore();
         }
@@ -1388,17 +1737,17 @@
         if (!gameRunning) {
             ctx.font = `bold ${Math.round(34*s)}px monospace`;
             ctx.fillStyle = '#FFF3DF';
-            ctx.fillText('ПОКИНУЛ НЕБО', canvas.width / 2 - Math.round(150*s), canvas.height / 2 - Math.round(40*s));
+            ctx.fillText('ПОКИНУЛ НЕБО', LOGICAL_W / 2 - Math.round(150*s), LOGICAL_H / 2 - Math.round(40*s));
             ctx.font = `${Math.round(18*s)}px monospace`;
             ctx.fillStyle = '#FFCF9A';
-            ctx.fillText('НАЖМИ ПРОБЕЛ / КЛИК / ТАП → НОВЫЙ ПОЛЁТ', canvas.width / 2 - Math.round(210*s), canvas.height / 2 + Math.round(40*s));
+            ctx.fillText('НАЖМИ ПРОБЕЛ / КЛИК / ТАП → НОВЫЙ ПОЛЁТ', LOGICAL_W / 2 - Math.round(210*s), LOGICAL_H / 2 + Math.round(40*s));
             
             // звезда на месте рекорда
             if (highScorePosition > 0) {
                 const starX = highScorePosition - cameraX;
                 const starY = highScorePositionY - camY;  // нужна будет отдельная переменная
                 
-                if (starX > -50 && starX < canvas.width + 50) {
+                if (starX > -50 && starX < LOGICAL_W + 50) {
                     ctx.font = '24px monospace';
                     ctx.fillStyle = '#FFD966';
                     ctx.shadowBlur = 4;
@@ -1412,17 +1761,19 @@
             }
         }
 
+        ctx.restore(); // конец HUD
+
         // эффект рассвета (линзовые блики + дымка)
         // теплая дымка поверх неба (мягкий градиент)
-        let hazeGrad = ctx.createLinearGradient(0, 0, 0, canvas.height);
+        let hazeGrad = ctx.createLinearGradient(0, 0, 0, LOGICAL_H);
         hazeGrad.addColorStop(0, 'rgba(255, 220, 150, 0.12)');
         hazeGrad.addColorStop(0.5, 'rgba(255, 180, 100, 0.05)');
         hazeGrad.addColorStop(1, 'rgba(255, 140, 80, 0)');
         ctx.fillStyle = hazeGrad;
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.fillRect(0, 0, LOGICAL_W, LOGICAL_H);
         
         // линзовый блик
-        let flareX = canvas.width - 80;
+        let flareX = LOGICAL_W - 80;
         let flareY = 60;        
         
         // основной блик (яркое пятно)
@@ -1449,6 +1800,8 @@
             ctx.fill();
         }
 
+        // конец кадра — сбрасываем трансформ для безопасности
+        ctx.setTransform(_DPR, 0, 0, _DPR, 0, 0);
     }
 
 
@@ -1477,6 +1830,10 @@
         windMilestoneIndex = 0;
         windNoticeTimer    = 0;
         MAX_VX_GROWTH      = Math.max(8, settingsMaxSpeed);
+        biomIndex          = 0;
+        biomTransition     = 1;
+        biomNoticeTimer    = 0;
+        biomParticles      = [];
         initMountains();
         for (let i = 0; i < 2; i++) addThermalIfNeeded();
     }
@@ -1484,18 +1841,17 @@
     // ========= ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ДЛЯ УПРАВЛЕНИЯ =========
 
     function getCanvasPos(e) {
+        // rect уже в CSS-пикселях = logical coords (ctx масштабирован через DPR)
         let rect = canvas.getBoundingClientRect();
-        let scaleX = canvas.width / rect.width;
-        let scaleY = canvas.height / rect.height;
         let clientX = e.touches ? e.touches[0].clientX : e.clientX;
         let clientY = e.touches ? e.touches[0].clientY : e.clientY;
-        return { x: (clientX - rect.left) * scaleX, y: (clientY - rect.top) * scaleY };
+        return { x: clientX - rect.left, y: clientY - rect.top };
     }
 
     function getSliderHit(cx, cy) {
         const s = UI_SCALE;
-        let px = canvas.width - Math.round(240 * s);
-        let py = canvas.height / 2 - Math.round(60 * s);
+        let px = LOGICAL_W - Math.round(240 * s);
+        let py = LOGICAL_H / 2 - Math.round(60 * s);
         let pw = Math.round(210 * s);
         if (cx >= px - 10 && cx <= px + pw + 10) {
             if (cy >= py + Math.round(16*s) && cy <= py + Math.round(44*s)) return 'volume';
@@ -1506,7 +1862,7 @@
 
     function applySliderDrag(slider, cx) {
         const s = UI_SCALE;
-        let px = canvas.width - Math.round(240 * s);
+        let px = LOGICAL_W - Math.round(240 * s);
         let pw = Math.round(210 * s);
         let t = Math.max(0, Math.min(1, (cx - px) / pw));
         if (slider === 'volume') {
