@@ -1,4 +1,9 @@
 (function() {
+
+    const SCRIPT_SRC  = document.currentScript ? document.currentScript.src : '';
+    const SCRIPT_DIR  = SCRIPT_SRC.substring(0, SCRIPT_SRC.lastIndexOf('/') + 1);
+    const WIND_MP3_URL = SCRIPT_DIR + '../sound/sound_wind.mp3';
+
     const canvas = document.getElementById('gameCanvas');
     const ctx = canvas.getContext('2d');
 
@@ -456,9 +461,11 @@
             audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 
             // ── Ветер: mp3-файл → lowpass (мягко) → bandpass (тихий свист) → gain ──
-            windAudioEl = new Audio('../sound/sound_wind.mp3');
+            windAudioEl = new Audio(WIND_MP3_URL);
             windAudioEl.loop = true;
-            windAudioEl.crossOrigin = 'anonymous';
+            windAudioEl.addEventListener('error', () => {
+                console.error('Не удалось загрузить звук ветра по пути:', WIND_MP3_URL);
+            });
             windSourceNode = audioCtx.createMediaElementSource(windAudioEl);
 
             // Мягкий lowpass — срезает всё резкое выше 900 Гц
