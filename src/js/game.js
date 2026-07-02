@@ -662,7 +662,9 @@
         osc.frequency.setValueAtTime(280, t);
         osc.frequency.exponentialRampToValueAtTime(620, t + 0.35);
         gain.gain.setValueAtTime(0, t);
-        gain.gain.linearRampToValueAtTime(0.18, t + 0.05);
+        // громкость увеличена (было 0.18) и привязана к настройке звука,
+        // чтобы свист термика пробивался через звук ветра из mp3
+        gain.gain.linearRampToValueAtTime(0.4 * Math.max(0.5, settingsVolume), t + 0.05);
         gain.gain.linearRampToValueAtTime(0, t + 0.35);
         osc.connect(gain);
         gain.connect(audioCtx.destination);
