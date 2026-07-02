@@ -428,58 +428,38 @@
     const FRAME_TIME = 1000 / 60;
     let lastUpdate = 0;
 
+
+    // 
     //звук
     let audioCtx  = null;
     let audioReady = false;
 
-    // ── Ветер ──────────────────────────────────────────────────────────────
+    //Ветер
     let windGain        = null;  // итоговая громкость ветра
     let windFilter1     = null;  // lowpass — "мягкость" (основной)
     let windFilter2     = null;  // bandpass — "свист" (тихий слой)
     let windNode        = null;
 
-    // ── Амбиент-слои (по биомам) ───────────────────────────────────────────
+    // Амбиент-слои (по биомам)
     // Каждый слой: осциллятор + gain.  Активен только один набор за раз.
     let ambLayers       = [];    // [{osc, gain, lfo, lfoGain}, ...]
     let ambMasterGain   = null;
     let ambCurrentBiom  = -1;   // id биома для которого запущен амбиент
 
-    // ── Розовый шум (1/f) — мягче белого ──────────────────────────────────
-    // Генерируем буфер один раз; AudioBufferSourceNode с loop
-    let pinkNode = null;
-
-    function makePinkBuffer() {
-        // 2 секунды розового шума при SR частоте
-        const sr     = audioCtx.sampleRate;
-        const len    = sr * 2;
-        const buf    = audioCtx.createBuffer(1, len, sr);
-        const data   = buf.getChannelData(0);
-        // алгоритм Voss–McCartney (простая аппроксимация 1/f)
-        let b0=0,b1=0,b2=0,b3=0,b4=0,b5=0,b6=0;
-        for (let i = 0; i < len; i++) {
-            const w = Math.random() * 2 - 1;
-            b0 = 0.99886*b0 + w*0.0555179;
-            b1 = 0.99332*b1 + w*0.0750759;
-            b2 = 0.96900*b2 + w*0.1538520;
-            b3 = 0.86650*b3 + w*0.3104856;
-            b4 = 0.55000*b4 + w*0.5329522;
-            b5 = -0.7616*b5 - w*0.0168980;
-            data[i] = (b0+b1+b2+b3+b4+b5+b6 + w*0.5362) / 9;
-            b6 = w * 0.115926;
-        }
-        return buf;
-    }
+    //Звук ветра из mp3-файла (вместо синтезированного розового шума)
+    let windAudioEl    = null;  // <audio> элемент, играет sound_wind.mp3 в цикле
+    let windSourceNode = null;  // MediaElementSource, чтобы пропустить mp3 через фильтры/gain ниже
 
     function initAudio() {
         if (audioReady) return;
         try {
             audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 
-            // ── Ветер: розовый шум → lowpass (мягко) → bandpass (тихий свист) → gain ──
-            const pinkBuf = makePinkBuffer();
-            pinkNode = audioCtx.createBufferSource();
-            pinkNode.buffer = pinkBuf;
-            pinkNode.loop   = true;
+            // ── Ветер: mp3-файл → lowpass (мягко) → bandpass (тихий свист) → gain ──
+            windAudioEl = new Audio('../sound/sound_wind.mp3');
+            windAudioEl.loop = true;
+            windAudioEl.crossOrigin = 'anonymous';
+            windSourceNode = audioCtx.createMediaElementSource(windAudioEl);
 
             // Мягкий lowpass — срезает всё резкое выше 900 Гц
             windFilter1 = audioCtx.createBiquadFilter();
@@ -500,17 +480,17 @@
             windGain = audioCtx.createGain();
             windGain.gain.value = 0;
 
-            // Pink → lowpass → windGain  (основной тракт)
-            pinkNode.connect(windFilter1);
+            // mp3 → lowpass → windGain  (основной тракт)
+            windSourceNode.connect(windFilter1);
             windFilter1.connect(windGain);
 
-            // Pink → bandpass → windBpGain → windGain  (свист поверх)
-            pinkNode.connect(windFilter2);
+            // mp3 → bandpass → windBpGain → windGain  (свист поверх)
+            windSourceNode.connect(windFilter2);
             windFilter2.connect(windBpGain);
             windBpGain.connect(windGain);
 
             windGain.connect(audioCtx.destination);
-            pinkNode.start();
+            windAudioEl.play().catch(e => console.warn('Wind mp3 play failed:', e));
 
             // ── Амбиент: мастер-гейн ──
             ambMasterGain = audioCtx.createGain();
@@ -2012,7 +1992,7 @@
         for (let i = 0; i < 2; i++) addThermalIfNeeded();
     }
     
-    // ========= ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ДЛЯ УПРАВЛЕНИЯ =========
+    //ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ДЛЯ УПРАВЛЕНИЯ
 
     function getCanvasPos(e) {
         // rect уже в CSS-пикселях = logical coords (ctx масштабирован через DPR)
