@@ -1,5 +1,7 @@
 (function() {
-
+    // Вычисляем путь к mp3 ОТНОСИТЕЛЬНО самого game.js, а не от HTML-страницы —
+    // так путь будет верным независимо от того, в какой папке лежит index.html
+    // и подключает ли он game.js напрямую или через другую вложенность.
     const SCRIPT_SRC  = document.currentScript ? document.currentScript.src : '';
     const SCRIPT_DIR  = SCRIPT_SRC.substring(0, SCRIPT_SRC.lastIndexOf('/') + 1);
     const WIND_MP3_URL = SCRIPT_DIR + '../sound/sound_wind.mp3';
@@ -631,22 +633,23 @@
         windFilter1.frequency.setTargetAtTime(300 + speed * 600, t, 0.8);
         windFilter2.frequency.setTargetAtTime(400 + speed * 400, t, 0.8);
 
-        // Амбиент: переключаем слои при смене биома
-        const curBiomId = getCurBiom().id;
-        if (curBiomId !== ambCurrentBiom) {
-            startAmbLayers(curBiomId);
-        }
-        // Подстраиваем громкость амбиента под settingsVolume и сложность
-        if (ambMasterGain) {
-            const def = BIOM_AMBIENT[curBiomId];
-            if (def) {
-                // На шторме амбиент нарастает с диффлевелом
-                const diffBoost = curBiomId === 'storm' ? 1 + diffLevel * 0.04 : 1;
-                ambMasterGain.gain.setTargetAtTime(
-                    def.masterGain * settingsVolume * diffBoost, t, 1.5
-                );
-            }
-        }
+        // ЗАКОММЕНТИРОВАНО: фоновый гул-эмбиент по биомам (BIOM_AMBIENT/startAmbLayers).
+        // Мешал слышать настоящий звук ветра из mp3. Код оставлен ниже —
+        // если захотим вернуть атмосферу, раскомментировать этот блок.
+        //
+        // const curBiomId = getCurBiom().id;
+        // if (curBiomId !== ambCurrentBiom) {
+        //     startAmbLayers(curBiomId);
+        // }
+        // if (ambMasterGain) {
+        //     const def = BIOM_AMBIENT[curBiomId];
+        //     if (def) {
+        //         const diffBoost = curBiomId === 'storm' ? 1 + diffLevel * 0.04 : 1;
+        //         ambMasterGain.gain.setTargetAtTime(
+        //             def.masterGain * settingsVolume * diffBoost, t, 1.5
+        //         );
+        //     }
+        // }
     }
 
     // короткий звук термика — нарастающий свист вверх
