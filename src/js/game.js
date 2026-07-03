@@ -254,7 +254,7 @@
 
     function getCurBiom()  { return BIOMES[biomIndex]; }
     function getNextBiom() { return BIOMES[Math.min(biomIndex+1, BIOMES.length-1)]; }
-    function biomT()       { return 1 - biomTransition; } // 0=cur, 1=next
+    function biomT()       { return biomTransition; } // 0=cur, 1=next
 
     // Конвертирует любой цвет (hex или rgba) в rgba-строку
     function toRgba(c, overrideAlpha) {
@@ -300,7 +300,7 @@
             biomNoticeTimer = 260;
             biomParticles   = [];
         }
-        if (biomTransition < 1) biomTransition = Math.min(1, biomTransition + 0.004);
+        if (biomTransition < 1) biomTransition = Math.min(1, biomTransition + 0.0015); // ~11 сек плавного перехода
         updateBiomParticles();
     }
 
@@ -1151,83 +1151,176 @@
     
     // привественный экран
     function drawWelcomeScreen() {
-        // тёмный градиентный фон
-        let grad = ctx.createLinearGradient(0, 0, 0, LOGICAL_H);
-        grad.addColorStop(0, '#2B1F3D');
-        grad.addColorStop(1, '#0a0c14');
-        ctx.fillStyle = grad;
+        const s = UI_SCALE;
+        const cx = LOGICAL_W / 2;
+
+        // ── фон ──
+        let bg = ctx.createLinearGradient(0, 0, 0, LOGICAL_H);
+        bg.addColorStop(0,   '#1a0f2e');
+        bg.addColorStop(0.4, '#2B1F3D');
+        bg.addColorStop(1,   '#0a0c14');
+        ctx.fillStyle = bg;
         ctx.fillRect(0, 0, LOGICAL_W, LOGICAL_H);
-        
-        // рассветное солнце
-        ctx.beginPath();
-        ctx.arc(LOGICAL_W - 60, 70, 38, 0, Math.PI * 2);
-        ctx.fillStyle = '#FFA471';
-        ctx.fill();
-        ctx.beginPath();
-        ctx.arc(LOGICAL_W - 60, 70, 28, 0, Math.PI * 2);
-        ctx.fillStyle = '#FFD89C';
-        ctx.fill();
-        
-        // силуэты гор на фоне
-        ctx.fillStyle = '#1D142B';
-        for (let i = 0; i < 5; i++) {
-            let x = i * 180 - (frame * 0.3) % 180;
+
+        // ── горы (используем реальные сегменты) ──
+        ctx.fillStyle = '#3E2C49';
+        for (let seg of mountainSegments) {
+            let sx = (seg.x - frame * 0.4) % (segmentWidth * mountainSegments.length);
+            if (sx + segmentWidth < -100 || sx > LOGICAL_W + 100) continue;
             ctx.beginPath();
-            ctx.moveTo(x, LOGICAL_H);
-            ctx.lineTo(x + 60, LOGICAL_H - 40);
-            ctx.lineTo(x + 120, LOGICAL_H - 20);
-            ctx.lineTo(x + 180, LOGICAL_H);
+            ctx.moveTo(sx, LOGICAL_H);
+            ctx.lineTo(sx, seg.y - 20);
+            ctx.quadraticCurveTo(sx+segmentWidth*.18,seg.y-44,sx+segmentWidth*.3,seg.y-38);
+            ctx.quadraticCurveTo(sx+segmentWidth*.45,seg.y-18,sx+segmentWidth*.55,seg.y-28);
+            ctx.quadraticCurveTo(sx+segmentWidth*.72,seg.y-36,sx+segmentWidth*.8,seg.y-18);
+            ctx.quadraticCurveTo(sx+segmentWidth*.92,seg.y-10,sx+segmentWidth,seg.y-14);
+            ctx.lineTo(sx + segmentWidth, LOGICAL_H);
             ctx.fill();
         }
-        
-        // заголовок
-        const s = UI_SCALE;
-        ctx.font = `bold ${Math.round(56*s)}px "Segoe UI", "Courier New", monospace`;
+        ctx.fillStyle = '#1D142B';
+        for (let seg of mountainSegments) {
+            let sx = (seg.x - frame * 0.9) % (segmentWidth * mountainSegments.length);
+            if (sx + segmentWidth < -100 || sx > LOGICAL_W + 100) continue;
+            ctx.beginPath();
+            ctx.moveTo(sx, LOGICAL_H);
+            ctx.lineTo(sx, seg.y);
+            ctx.quadraticCurveTo(sx+segmentWidth*.15,seg.y-20,sx+segmentWidth*.25,seg.y-14);
+            ctx.quadraticCurveTo(sx+segmentWidth*.38,seg.y-34,sx+segmentWidth*.45,seg.y-24);
+            ctx.quadraticCurveTo(sx+segmentWidth*.58,seg.y-10,sx+segmentWidth*.65,seg.y-18);
+            ctx.quadraticCurveTo(sx+segmentWidth*.82,seg.y-20,sx+segmentWidth,seg.y-6);
+            ctx.lineTo(sx + segmentWidth, LOGICAL_H);
+            ctx.fill();
+        }
+
+        // ── солнце (полноценное, как в игре) ──
+        let sunX = LOGICAL_W - 120, sunY = 110;
+        let pulse = 0.95 + Math.sin(frame * 0.03) * 0.05;
+        let atm = ctx.createRadialGradient(sunX, sunY, 20, sunX, sunY, 180);
+        atm.addColorStop(0, 'rgba(255,220,150,0.1)');
+        atm.addColorStop(1, 'rgba(255,120,50,0)');
+        ctx.fillStyle = atm;
+        ctx.beginPath(); ctx.arc(sunX, sunY, 180, 0, Math.PI*2); ctx.fill();
+
+        for (let [count, rSpeed, minR, len, spread, color] of [
+            [10,  0.008, 30, 95, 5,   'rgba(255,220,150,0.1)'],
+            [6,  -0.005, 22, 65, 3,   'rgba(255,245,200,0.12)'],
+            [14,  0.022, 28, 42, 1.5, 'rgba(255,255,220,0.18)'],
+        ]) {
+            ctx.save(); ctx.translate(sunX, sunY); ctx.rotate(frame * rSpeed);
+            for (let i = 0; i < count; i++) {
+                ctx.save(); ctx.rotate((i/count)*Math.PI*2);
+                let l = len + Math.sin(frame*0.05+i)*8;
+                ctx.beginPath(); ctx.moveTo(minR,0); ctx.lineTo(l,-spread); ctx.lineTo(l,spread);
+                ctx.fillStyle = color; ctx.fill(); ctx.restore();
+            }
+            ctx.restore();
+        }
+        let outer = ctx.createRadialGradient(sunX,sunY,10,sunX,sunY,85);
+        outer.addColorStop(0,'rgba(255,235,180,0.35)'); outer.addColorStop(1,'rgba(255,140,80,0)');
+        ctx.fillStyle = outer; ctx.beginPath(); ctx.arc(sunX,sunY,85*pulse,0,Math.PI*2); ctx.fill();
+        let core = ctx.createRadialGradient(sunX-5,sunY-5,0,sunX,sunY,38);
+        core.addColorStop(0,'#fffef0'); core.addColorStop(0.25,'#ffe6b0');
+        core.addColorStop(0.7,'#ffbc60'); core.addColorStop(1,'#ff9028');
+        ctx.fillStyle = core; ctx.beginPath(); ctx.arc(sunX,sunY,34*pulse,0,Math.PI*2); ctx.fill();
+        ctx.beginPath(); ctx.arc(sunX,sunY,7,0,Math.PI*2);
+        ctx.fillStyle='rgba(255,255,240,0.85)'; ctx.fill();
+
+        // ── частицы ──
+        for (let i = 0; i < 16; i++) {
+            let px2 = (frame*0.15 + i*71) % (LOGICAL_W+100) - 50;
+            let py2 = 40 + Math.sin(frame*0.018 + i*0.7)*35;
+            ctx.fillStyle = `rgba(255,215,150,${0.12+Math.sin(frame*0.04+i)*0.07})`;
+            ctx.beginPath(); ctx.arc(px2, py2, 1.5+Math.sin(frame*0.06+i)*0.8, 0, Math.PI*2); ctx.fill();
+        }
+
+        // ── ЛЕВАЯ ЧАСТЬ ──
+        ctx.save();
+        ctx.textAlign = 'left';
+        let tx = Math.round(60*s);
+        let ty = Math.round(LOGICAL_H/2 - 90*s);
+
+        // название
+        ctx.font = `bold ${Math.round(64*s)}px "Segoe UI", monospace`;
+        ctx.fillStyle = 'rgba(255,249,232,0.06)';
+        ctx.fillText('SUNRISE', tx+2, ty+3);
+        ctx.shadowBlur = 16; ctx.shadowColor = 'rgba(255,180,80,0.3)';
         ctx.fillStyle = '#FFF9E8';
-        ctx.shadowBlur = 8;
-        ctx.shadowColor = 'rgba(0,0,0,0.5)';
-        ctx.fillText('SUNRISE', LOGICAL_W / 2 - Math.round(130*s), LOGICAL_H / 2 - Math.round(80*s));
+        ctx.fillText('SUNRISE', tx, ty);
         ctx.shadowBlur = 0;
-        
+
         // подзаголовок
-        ctx.font = `${Math.round(18*s)}px monospace`;
-        ctx.fillStyle = '#FFD6A5';
-        ctx.fillText('', LOGICAL_W / 2 - Math.round(85*s), LOGICAL_H / 2 - Math.round(30*s));
-        
-        // описание управления
-        ctx.font = `${Math.round(14*s)}px monospace`;
-        ctx.fillStyle = '#ffd9b5';
-        ctx.fillText('ЗАЖМИ — ПИКИРУЙ', LOGICAL_W / 2 - Math.round(100*s), LOGICAL_H / 2 + Math.round(40*s));
-        ctx.fillText('ОТПУСТИ — ПАРИ', LOGICAL_W / 2 - Math.round(90*s), LOGICAL_H / 2 + Math.round(68*s));
-        
-        // подсказка для мобильных
-        ctx.fillText('ПОВЕРНИТЕ ТЕЛЕФОН', LOGICAL_W / 2 - Math.round(100*s), LOGICAL_H / 2 + Math.round(105*s));
-        ctx.fillText('ДЛЯ КОМФОРТНОЙ ИГРЫ', LOGICAL_W / 2 - Math.round(100*s), LOGICAL_H / 2 + Math.round(125*s));
-    
-        // визуальная подсказка
-        ctx.font = `bold ${Math.round(18*s)}px monospace`;
-        ctx.fillStyle = '#FFCF9A';
-        ctx.fillText('--> ЛЮБОЕ НАЖАТИЕ <--', LOGICAL_W / 2 - Math.round(110*s), LOGICAL_H / 2 + Math.round(165*s));
-        
+        ctx.font = `${Math.round(13*s)}px monospace`;
+        ctx.fillStyle = 'rgba(255,185,100,0.65)';
+        ctx.fillText('✦  ИГРА О ЛЁГКОСТИ  ✦', tx, ty + Math.round(32*s));
+
+        // разделитель
+        ctx.beginPath();
+        ctx.moveTo(tx, ty + Math.round(46*s));
+        ctx.lineTo(tx + Math.round(230*s), ty + Math.round(46*s));
+        ctx.strokeStyle = 'rgba(255,217,181,0.12)'; ctx.lineWidth = 1; ctx.stroke();
+
+        // управление
+        let gy = ty + Math.round(76*s);
+        ctx.font = `${Math.round(12*s)}px monospace`;
+        [
+            ['▼', 'ЗАЖМИ — ПИКИРУЙ'],
+            ['▲', 'ОТПУСТИ — ПАРИ'],
+            ['✦', 'ТЕРМИКИ ДАЮТ ЛЁГКОСТЬ'],
+            ['☁', 'ОБЛАКА ЗАМЕДЛЯЮТ'],
+        ].forEach(([icon, text], i) => {
+            let ly = gy + i * Math.round(26*s);
+            ctx.fillStyle = 'rgba(255,185,100,0.55)';
+            ctx.fillText(icon, tx, ly);
+            ctx.fillStyle = 'rgba(255,217,181,0.72)';
+            ctx.fillText(text, tx + Math.round(22*s), ly);
+        });
+
+        // ONE BUTTON бейдж
+        let by = gy + Math.round(118*s);
+        ctx.fillStyle = 'rgba(255,185,100,0.08)';
+        ctx.beginPath();
+        ctx.roundRect(tx - Math.round(6*s), by - Math.round(14*s), Math.round(162*s), Math.round(22*s), Math.round(4*s));
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(255,185,100,0.25)'; ctx.lineWidth = 1; ctx.stroke();
+        ctx.font = `bold ${Math.round(10*s)}px monospace`;
+        ctx.fillStyle = 'rgba(255,200,120,0.75)';
+        ctx.fillText('⬡  ONE BUTTON GAME', tx, by);
+
         // рекорд
         if (highScore > 0) {
-            ctx.font = `${Math.round(13*s)}px monospace`;
-            ctx.fillStyle = '#c9b28b';
-            ctx.fillText(`лучший полёт: ${highScore} ✦`, LOGICAL_W / 2 - Math.round(80*s), LOGICAL_H - Math.round(60*s));
+            ctx.font = `${Math.round(11*s)}px monospace`;
+            ctx.fillStyle = 'rgba(201,178,139,0.55)';
+            ctx.fillText('РЕКОРД  ' + highScore + '  ✦', tx, by + Math.round(28*s));
         }
 
-        
-        // парящие частицы
-        for (let i = 0; i < 12; i++) {
-            let x = (frame * 0.2 + i * 37) % (LOGICAL_W + 100) - 50;
-            let y = 80 + Math.sin(frame * 0.02 + i) * 25;
-            ctx.fillStyle = `rgba(255, 215, 150, ${0.2 + Math.sin(frame * 0.05 + i) * 0.1})`;
-            ctx.beginPath();
-            ctx.arc(x, y, 2 + Math.sin(frame * 0.07 + i) * 1, 0, Math.PI * 2);
-            ctx.fill();
-        }
+        ctx.restore();
 
-        // панель настроек
+        // ── КНОПКА СТАРТА ──
+        let btnX = cx, btnY = LOGICAL_H - Math.round(68*s);
+        let bp = 0.85 + Math.sin(frame*0.06)*0.15;
+        let btnR = Math.round(28*s) * bp;
+
+        ctx.beginPath(); ctx.arc(btnX, btnY, btnR + Math.round(14*s), 0, Math.PI*2);
+        ctx.fillStyle = `rgba(255,185,100,${0.05*bp})`; ctx.fill();
+
+        ctx.beginPath(); ctx.arc(btnX, btnY, btnR, 0, Math.PI*2);
+        ctx.strokeStyle = `rgba(255,200,130,${0.45+Math.sin(frame*0.06)*0.2})`;
+        ctx.lineWidth = Math.round(1.5*s); ctx.stroke();
+
+        ctx.beginPath(); ctx.arc(btnX, btnY, btnR - Math.round(3*s), 0, Math.PI*2);
+        ctx.fillStyle = `rgba(255,185,80,${0.1*bp})`; ctx.fill();
+
+        ctx.save();
+        ctx.textAlign = 'center';
+        ctx.font = `bold ${Math.round(9*s)}px monospace`;
+        ctx.fillStyle = `rgba(255,230,180,${0.65+Math.sin(frame*0.06)*0.3})`;
+        ctx.fillText('НАЖМИ', btnX, btnY + Math.round(3*s));
+        ctx.font = `${Math.round(10*s)}px monospace`;
+        ctx.fillStyle = 'rgba(255,217,181,0.28)';
+        ctx.fillText('ПРОБЕЛ  /  КЛИК  /  ТАП', btnX, btnY + Math.round(46*s));
+        ctx.restore();
+
+        // ── настройки ──
         drawSettingsPanel();
     }
 
