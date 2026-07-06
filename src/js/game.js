@@ -122,6 +122,7 @@
             sun: { color0: '#fffef0', color1: '#ffe6b0', color2: '#ffbc60', color3: '#ff9028', glow: 'rgba(255,220,150,0.08)', rays: 'rgba(255,220,150,0.12)' },
             farMtn:  '#3E2C49',
             nearMtn: '#1D142B',
+            nearMtnTop: '#2E1E3F',
             snowCap: 'rgba(255,245,235,0.55)',
             cloudTop: 'rgba(255,255,255,0.92)',
             cloudBot: 'rgba(230,235,245,0.72)',
@@ -145,6 +146,7 @@
             sun: { color0: '#ffffff', color1: '#fff4c2', color2: '#ffe680', color3: '#ffd230', glow: 'rgba(255,255,200,0.10)', rays: 'rgba(255,255,180,0.14)' },
             farMtn:  '#2A4A7A',
             nearMtn: '#172B50',
+            nearMtnTop: '#1E3A6A',
             snowCap: 'rgba(255,255,255,0.75)',
             cloudTop: 'rgba(255,255,255,0.95)',
             cloudBot: 'rgba(220,235,255,0.80)',
@@ -168,6 +170,7 @@
             sun: { color0: '#fff0c0', color1: '#ffcc60', color2: '#ff8c00', color3: '#cc3300', glow: 'rgba(255,140,0,0.12)', rays: 'rgba(255,160,50,0.15)' },
             farMtn:  '#5C1A2A',
             nearMtn: '#2A0A15',
+            nearMtnTop: '#3E1220',
             snowCap: 'rgba(255,200,150,0.50)',
             cloudTop: 'rgba(255,220,180,0.90)',
             cloudBot: 'rgba(200,120,80,0.70)',
@@ -191,6 +194,7 @@
             sun: { color0: '#ffaacc', color1: '#cc88ff', color2: '#8844cc', color3: '#440088', glow: 'rgba(180,100,255,0.10)', rays: 'rgba(200,120,255,0.12)' },
             farMtn:  '#1A0A2E',
             nearMtn: '#0A0518',
+            nearMtnTop: '#180A28',
             snowCap: 'rgba(200,180,255,0.45)',
             cloudTop: 'rgba(180,160,220,0.80)',
             cloudBot: 'rgba(100,80,150,0.65)',
@@ -214,6 +218,7 @@
             sun: { color0: '#c0d8ff', color1: '#8ab0e0', color2: '#4060a0', color3: '#1a3060', glow: 'rgba(100,150,255,0.06)', rays: 'rgba(120,160,255,0.08)' },
             farMtn:  '#12182A',
             nearMtn: '#080C18',
+            nearMtnTop: '#101828',
             snowCap: 'rgba(180,200,255,0.35)',
             cloudTop: 'rgba(100,120,160,0.85)',
             cloudBot: 'rgba(40,50,80,0.75)',
@@ -1600,82 +1605,106 @@
         ctx.fill();
     }
         
-    //дальние горы — биом
-    ctx.fillStyle = biomColor('farMtn');
-
-    for (let seg of mountainSegments) {
-        let screenX = seg.x - cameraX;
-        let y = seg.y - camY;
-
-        if (screenX + segmentWidth > -50 && screenX < LOGICAL_W + 100) {
-            ctx.beginPath();
-            ctx.moveTo(screenX, LOGICAL_H);
-            ctx.lineTo(screenX, y - 20);
-
-            ctx.quadraticCurveTo(
-                screenX + segmentWidth * 0.18,y - 44,
-                screenX + segmentWidth * 0.3,y - 38
-            );
-            ctx.quadraticCurveTo(
-                screenX + segmentWidth * 0.45,y - 18,
-                screenX + segmentWidth * 0.55,y - 28
-            );
-            ctx.quadraticCurveTo(
-                screenX + segmentWidth * 0.72,y - 36,
-                screenX + segmentWidth * 0.8,y - 18
-            );
-            ctx.quadraticCurveTo(
-                screenX + segmentWidth * 0.92,y - 10,
-                screenX + segmentWidth,y - 14
-            );
-            ctx.lineTo(screenX + segmentWidth, LOGICAL_H);
-            ctx.fill();
+    // ── горы: одна вершина на сегмент, сплайн без волн ──
+    function buildMtnPoints(offsetY) {
+        let pts = [];
+        for (let seg of mountainSegments) {
+            // центр сегмента = вершина горы
+            let sx = seg.x - cameraX + segmentWidth * 0.5;
+            let sy = seg.y - camY - offsetY;
+            pts.push({ x: sx, y: sy, baseY: seg.y - offsetY });
         }
+        return pts;
+    }
+
+    function drawMtnLayer(pts, fillStyle, snowColor) {
+        if (pts.length < 2) return;
+        let visible = [];
+        for (let i = 0; i < pts.length; i++) {
+            if (pts[i].x > -segmentWidth * 2 && pts[i].x < LOGICAL_W + segmentWidth * 2)
+                visible.push({ idx: i, p: pts[i] });
+        }
+        if (visible.length < 2) return;
+
+        let first = visible[0].p;
+        let last  = visible[visible.length - 1].p;
+
+        ctx.beginPath();
+        ctx.moveTo(first.x - segmentWidth * 0.5, LOGICAL_H);
+        ctx.lineTo(first.x - segmentWidth * 0.5, first.y);
+
+        // через каждую вершину — Catmull-Rom, низкое натяжение = острее пики
+        for (let j = 0; j < visible.length - 1; j++) {
+            let i0 = Math.max(0, visible[j].idx - 1);
+            let i1 = visible[j].idx;
+            let i2 = visible[j + 1].idx;
+            let i3 = Math.min(pts.length - 1, visible[j + 1].idx + 1);
+            let p0 = pts[i0], p1 = pts[i1], p2 = pts[i2], p3 = pts[i3];
+            let t = 0.18;  // низкое натяжение = острые пики, не волны
+            let cp1x = p1.x + (p2.x - p0.x) * t;
+            let cp1y = p1.y + (p2.y - p0.y) * t;
+            let cp2x = p2.x - (p3.x - p1.x) * t;
+            let cp2y = p2.y - (p3.y - p1.y) * t;
+            ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, p2.x, p2.y);
         }
 
+        ctx.lineTo(last.x + segmentWidth * 0.5, LOGICAL_H);
+        ctx.closePath();
+        ctx.fillStyle = fillStyle;
+        ctx.fill();
 
-    //ближние горы — биом
-    ctx.fillStyle = biomColor('nearMtn');
-
-    for (let seg of mountainSegments) {
-        let screenX = seg.x - cameraX;
-        let y = seg.y - camY;
-
-        if (screenX + segmentWidth > -50 && screenX < LOGICAL_W + 100) {
-            ctx.beginPath();
-            ctx.moveTo(screenX, LOGICAL_H);
-            ctx.lineTo(screenX, y);
-            ctx.quadraticCurveTo(
-                screenX + segmentWidth * 0.15,y - 20,
-                screenX + segmentWidth * 0.25,y - 14
-            );
-            ctx.quadraticCurveTo(
-                screenX + segmentWidth * 0.38, y - 34,
-                screenX + segmentWidth * 0.45, y - 24
-            );
-            ctx.quadraticCurveTo(
-                screenX + segmentWidth * 0.58,y - 10,
-                screenX + segmentWidth * 0.65,y - 18
-            );
-            ctx.quadraticCurveTo(
-                screenX + segmentWidth * 0.82,y - 20,
-                screenX + segmentWidth,y - 6
-            );
-            ctx.lineTo(screenX + segmentWidth, LOGICAL_H);
-            ctx.fill();
-
-            // снежная шапка (биом)
-            ctx.save();
-            ctx.fillStyle = biomColor('snowCap');
-            ctx.beginPath();
-            ctx.moveTo(screenX, y);
-            ctx.quadraticCurveTo(screenX + segmentWidth*0.38, y - 34, screenX + segmentWidth*0.45, y - 24);
-            ctx.quadraticCurveTo(screenX + segmentWidth*0.45, y - 14, screenX + segmentWidth*0.38, y - 10);
-            ctx.quadraticCurveTo(screenX + segmentWidth*0.20, y - 6, screenX, y);
-            ctx.fill();
-            ctx.restore();
+        // снежные шапки — только на реальных пиках (локальный минимум Y)
+        if (snowColor) {
+            for (let j = 1; j < visible.length - 1; j++) {
+                let prev = visible[j - 1].p;
+                let cur  = visible[j].p;
+                let next = visible[j + 1].p;
+                // локальный пик = выше соседей
+                if (cur.y < prev.y && cur.y < next.y) {
+                    let capH = (Math.min(prev.y, next.y) - cur.y) * 0.55;
+                    capH = Math.max(8, Math.min(capH, 40));
+                    ctx.save();
+                    ctx.beginPath();
+                    ctx.moveTo(cur.x - capH * 0.9, cur.y + capH * 0.6);
+                    ctx.quadraticCurveTo(cur.x - capH * 0.3, cur.y + capH * 0.15, cur.x, cur.y - 4);
+                    ctx.quadraticCurveTo(cur.x + capH * 0.3, cur.y + capH * 0.15, cur.x + capH * 0.9, cur.y + capH * 0.6);
+                    ctx.closePath();
+                    ctx.fillStyle = snowColor;
+                    ctx.fill();
+                    ctx.restore();
+                }
+            }
         }
     }
+
+    let farPts  = buildMtnPoints(20);
+    let nearPts = buildMtnPoints(0);
+
+    // дальние горы
+    drawMtnLayer(farPts, biomColor('farMtn'), null);
+
+    // атмосферная дымка
+    {
+        let vis = farPts.filter(p => p.x > 0 && p.x < LOGICAL_W);
+        if (vis.length) {
+            let hazeY = Math.min(...vis.map(p => p.y));
+            let haze = ctx.createLinearGradient(0, hazeY - 20, 0, hazeY + 90);
+            haze.addColorStop(0,   'rgba(60,30,100,0)');
+            haze.addColorStop(0.5, 'rgba(40,20,70,0.14)');
+            haze.addColorStop(1,   'rgba(10,5,20,0)');
+            ctx.fillStyle = haze;
+            ctx.fillRect(0, hazeY - 20, LOGICAL_W, 110);
+        }
+    }
+
+    // ближние горы с градиентом и снегом
+    let nearVisible = nearPts.filter(p => p.x > 0 && p.x < LOGICAL_W);
+    let nearTop = nearVisible.length ? Math.min(...nearVisible.map(p => p.y)) : 0;
+    let nearGrad = ctx.createLinearGradient(0, nearTop - 20, 0, LOGICAL_H);
+    nearGrad.addColorStop(0,    biomColor('nearMtnTop') || biomColor('nearMtn'));
+    nearGrad.addColorStop(0.4,  biomColor('nearMtn'));
+    nearGrad.addColorStop(1,    biomColor('nearMtn'));
+    drawMtnLayer(nearPts, nearGrad, biomColor('snowCap'));
 
         // облака
         for (let c of clouds) {
