@@ -73,6 +73,12 @@
         radius: 9
     };
 
+    // ── Анимация смерти: кувырок вниз перед экраном Game Over ──
+    let isDying           = false; // true — персонаж уже неуправляем и падает
+    let deathTimer         = 0;     // сколько секунд длится анимация
+    let deathSpinDir       = 1;     // направление кувырка (зависит от скорости на момент смерти)
+    const DEATH_ANIM_DURATION = 1.1; // сек — как долго крутится/падает перед Game Over
+
     function resetPlayerPos() {
         player.x = LOGICAL_W * 0.35;
         player.y = LOGICAL_H * 0.55;
@@ -848,14 +854,22 @@
     function addCloudIfNeeded() {
         if (clouds.length >= 4) return;
         if (Math.random() * 300 < 5) return;
-        
+
+        // depth: 0 = далёкое облако (мелкое, тусклое, медленное, размытое)
+        //        1 = близкое облако (крупное, чёткое, быстрое)
+        const depth      = Math.random();
+        const sizeScale  = 0.6 + depth * 0.7;  // 0.6x .. 1.3x размера
+        const speedScale = 0.5 + depth * 0.9;  // 0.5x .. 1.4x скорости параллакса
+
         clouds.push({
             x: cameraX + LOGICAL_W + 50 + Math.random() * 200,
-            y: 60 + Math.random() * (LOGICAL_H - 120), 
-            width: 35 + Math.random() * 25,   
-            height: 20 + Math.random() * 15, 
+            y: 60 + Math.random() * (LOGICAL_H - 120),
+            width: (35 + Math.random() * 25) * sizeScale,
+            height: (20 + Math.random() * 15) * sizeScale,
             speedY: (Math.random() - 0.5) * 0.3,
-            opacity: 0.7 + Math.random() * 0.3
+            opacity: (0.55 + Math.random() * 0.3) * (0.6 + depth * 0.5),
+            depth: depth,
+            speedScale: speedScale
         });
     }
     
@@ -996,13 +1010,50 @@
         }
     }
 
+    // запускает анимацию смерти вместо мгновенного стопа
+    function triggerDeath() {
+        if (isDying || !gameRunning) return;
+        isDying     = true;
+        deathTimer  = 0;
+        // кувыркаемся в ту сторону, куда уже наклонён/летит персонаж —
+        // выглядит естественнее, чем случайное направление
+        deathSpinDir = player.vx >= 0 ? 1 : -1;
+        playDeathSound();
+    }
+
+    // персонаж полностью теряет управление: кувыркается и падает
+    function updateDeathTumble(dt, delta) {
+        player.vy += GRAVITY * dt * 1.5;         // падает быстрее обычного
+        if (player.vy > MAX_VY * 2) player.vy = MAX_VY * 2;
+        player.y  += player.vy * dt;
+
+        player.vx *= Math.pow(0.97, dt);          // теряет горизонтальную скорость
+        player.x  += player.vx * dt;
+
+        player.angle += deathSpinDir * 0.24 * dt; // собственно кувырок
+
+        cameraX = player.x - LOGICAL_W * 0.35;
+        if (cameraX < 0) cameraX = 0;
+
+        deathTimer += delta;
+        if (deathTimer >= DEATH_ANIM_DURATION) {
+            isDying     = false;
+            gameRunning = false; // теперь показываем экран "ПОКИНУЛ НЕБО"
+        }
+    }
+
     //обновление
     function updateGame(delta) {
         if (!gameRunning) return;
-        
+
         // нормализуем delta (чтобы при 60 FPS всё работало как раньше)
         let dt = Math.min(1.5, delta * 60);
-        
+
+        if (isDying) {
+            updateDeathTumble(dt, delta);
+            return;
+        }
+
         //управление по вертикали
         if (isPressing) {
             //пикирование
@@ -1029,8 +1080,7 @@
         
         //границы по вертикали
         if (player.y < 32) {
-            gameRunning = false;
-            playDeathSound();
+            triggerDeath();
             return;
         }
 
@@ -1057,8 +1107,7 @@
         }
         if (player.y + 12 >= LOGICAL_H - 18) groundCollision = true;
         if (groundCollision) {
-            gameRunning = false;
-            playDeathSound();
+            triggerDeath();
             return;
         }
         
@@ -1132,7 +1181,7 @@
         // облака
         for (let i = 0; i < clouds.length; i++) {
             let c = clouds[i];
-            c.x -= player.vx * 0.55 * dt;
+            c.x -= player.vx * 0.55 * c.speedScale * dt; // параллакс: ближе — быстрее, дальше — медленнее
             c.y += c.speedY * dt;
             
             let dx = player.x - c.x;
@@ -1901,13 +1950,21 @@
     drawMtnLayer(nearPts, nearGrad, biomColor('snowCap'));
 
         // облака
-        for (let c of clouds) {
+        // рисуем от дальних к ближним (параллакс) — дальние облака мельче, тусклее и мягче
+        const cloudsToDraw = [...clouds].sort((a, b) => a.depth - b.depth);
+        for (let c of cloudsToDraw) {
             let x = c.x - cameraX;
             let y = c.y - camY;
             let w = c.width;
             let h = c.height;
             
             if (!isFinite(x) || !isFinite(y) || !w || !h) continue;
+
+            ctx.save();
+            ctx.globalAlpha = c.opacity;
+            // дальние облака чуть размыты — усиливает ощущение глубины
+            ctx.filter = `blur(${Math.max(0, (1 - c.depth) * 1.6).toFixed(2)}px)`;
+
             // лёгкая дымка вокруг облака
             let glow = ctx.createRadialGradient(x, y, h * 0.2, x, y, w * 0.9);
 
@@ -1958,6 +2015,7 @@
             ctx.arc(x - w * 0.1, y - h * 0.18, h * 0.56, 0, Math.PI * 2);
             ctx.arc(x + w * 0.22, y - h * 0.08, h * 0.5, 0, Math.PI * 2);
             ctx.stroke();
+            ctx.restore();
         }
 
         //термики
@@ -2282,6 +2340,23 @@
             ctx.fill();
         }
 
+        // виньетирование на опасной скорости — тёмно-красные края экрана,
+        // усиливаются по мере разгона к текущему максимуму скорости
+        const DANGER_SPEED_THRESHOLD = 0.72; // с какой доли макс. скорости начинает проявляться
+        const speedRatio = Math.max(0, Math.min(1, player.vx / MAX_VX_GROWTH));
+        const dangerT = Math.max(0, (speedRatio - DANGER_SPEED_THRESHOLD) / (1 - DANGER_SPEED_THRESHOLD));
+        if (dangerT > 0) {
+            const vignetteStrength = dangerT * 0.5; // максимальная непрозрачность краёв
+            const vgX = LOGICAL_W / 2, vgY = LOGICAL_H / 2;
+            const innerR = Math.min(LOGICAL_W, LOGICAL_H) * 0.32;
+            const outerR = Math.max(LOGICAL_W, LOGICAL_H) * 0.75;
+            let vignette = ctx.createRadialGradient(vgX, vgY, innerR, vgX, vgY, outerR);
+            vignette.addColorStop(0, 'rgba(110, 10, 10, 0)');
+            vignette.addColorStop(1, `rgba(110, 10, 10, ${vignetteStrength.toFixed(3)})`);
+            ctx.fillStyle = vignette;
+            ctx.fillRect(0, 0, LOGICAL_W, LOGICAL_H);
+        }
+
         // конец кадра — сбрасываем трансформ для безопасности
         ctx.setTransform(_DPR, 0, 0, _DPR, 0, 0);
     }
@@ -2290,6 +2365,8 @@
     //управление
     function restartGame() {
         gameRunning = true;
+        isDying = false;
+        deathTimer = 0;
         score = 0;
         resetPlayerPos();
         player.vx = 3.8;
