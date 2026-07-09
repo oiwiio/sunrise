@@ -73,7 +73,7 @@
         radius: 9
     };
 
-    // ── Анимация смерти: кувырок вниз перед экраном Game Over ──
+    // Анимация смерти: кувырок вниз перед экраном Game Over ──
     let isDying           = false; // true — персонаж уже неуправляем и падает
     let deathTimer         = 0;     // сколько секунд длится анимация
     let deathSpinDir       = 1;     // направление кувырка (зависит от скорости на момент смерти)
@@ -480,7 +480,6 @@
     let lastUpdate = 0;
 
 
-    // 
     //звук
     let audioCtx  = null;
     let audioReady = false;
@@ -506,7 +505,7 @@
         try {
             audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 
-            // ── Ветер: mp3-файл → lowpass (мягко) → bandpass (тихий свист) → gain ──
+            // Ветер: mp3-файл → lowpass (мягко) → bandpass (тихий свист) → gain ──
             windAudioEl = new Audio(WIND_MP3_URL);
             windAudioEl.loop = true;
             windAudioEl.addEventListener('error', () => {
@@ -545,7 +544,7 @@
             windGain.connect(audioCtx.destination);
             windAudioEl.play().catch(e => console.warn('Wind mp3 play failed:', e));
 
-            // ── Амбиент: мастер-гейн ──
+            // Амбиент: мастер-гейн ──
             ambMasterGain = audioCtx.createGain();
             ambMasterGain.gain.value = 0;
             ambMasterGain.connect(audioCtx.destination);
@@ -772,7 +771,7 @@
         restartGame();
     }
     
-    //горы
+    // горы
     function initMountains() {
         mountainSegments = [];
         let lastHeight = LOGICAL_H - 85;
@@ -804,13 +803,13 @@
             y: newY,
             width: segmentWidth
         });
-        //удаление сегментов позади
+        // удаление сегментов позади
         while (mountainSegments.length > 0 && mountainSegments[0].x + segmentWidth < cameraX - 300) {
             mountainSegments.shift();
         }
     }
 
-    //термики
+    // термики
     function addThermalIfNeeded() {
         if (thermals.length >= THERMAL_MAX) return;
         if (Math.random() * 300 < THERMAL_GEN_RATE) {
@@ -836,7 +835,7 @@
         }
     }
 
-    //облака - препятствия
+    // облака - препятствия
     function addCloudPoof(x, y, size) {
         for (let i = 0; i < 12; i++) {
             sparkParticles.push({
@@ -1042,7 +1041,7 @@
         }
     }
 
-    //обновление
+    // обновление
     function updateGame(delta) {
         if (!gameRunning) return;
 
@@ -1069,16 +1068,16 @@
         if (player.vy < -4.6) player.vy = -4.6;
         player.y += player.vy * dt;
         
-        //горизонтальное движение
+        // горизонтальное движение
         player.vx += WIND_BOOST * dt;
         if (player.vx > MAX_VX_GROWTH) player.vx = MAX_VX_GROWTH;
         player.x += player.vx * dt;
         
-        //камера за игроком
+        // камера за игроком
         cameraX = player.x - LOGICAL_W * 0.35;
         if (cameraX < 0) cameraX = 0;
         
-        //границы по вертикали
+        // границы по вертикали
         if (player.y < 32) {
             triggerDeath();
             return;
@@ -1145,7 +1144,7 @@
         }
     }
         
-        //потоки
+        // потоки
         for (let i = 0; i < downdrafts.length; i++) {
             let d = downdrafts[i];
             let dx = player.x - d.x;
@@ -1164,7 +1163,7 @@
             }
         }
         
-        //генерация
+        // генерация
         addThermalIfNeeded();
         addDowndraftIfNeeded();
         
@@ -1215,14 +1214,14 @@
             score += Math.min(2, speedBonus);
         }
         
-        //плавный возврат угла
+        // плавный возврат угла
        player.angle *= Math.pow(0.98, dt);
         
         //частицы
         addWindParticle();
         updateParticles();
         
-        //рекорд
+        // рекорд
         if (Math.floor(score) > highScore) {
             highScore = Math.floor(score);
             highScorePosition = player.x;
@@ -1241,7 +1240,7 @@
         const s = UI_SCALE;
         const cx = LOGICAL_W / 2;
 
-        // ── фон ──
+        // фон
         let bg = ctx.createLinearGradient(0, 0, 0, LOGICAL_H);
         bg.addColorStop(0,   '#1a0f2e');
         bg.addColorStop(0.4, '#2B1F3D');
@@ -1249,7 +1248,7 @@
         ctx.fillStyle = bg;
         ctx.fillRect(0, 0, LOGICAL_W, LOGICAL_H);
 
-        // ── горы (используем реальные сегменты) ──
+        // горы (используем реальные сегменты) ──
         ctx.fillStyle = '#3E2C49';
         for (let seg of mountainSegments) {
             let sx = (seg.x - frame * 0.4) % (segmentWidth * mountainSegments.length);
@@ -1279,7 +1278,7 @@
             ctx.fill();
         }
 
-        // ── солнце (полноценное, как в игре) ──
+        // солнце (полноценное, как в игре) ──
         let sunX = LOGICAL_W - 120, sunY = 110;
         let pulse = 0.95 + Math.sin(frame * 0.03) * 0.05;
         let atm = ctx.createRadialGradient(sunX, sunY, 20, sunX, sunY, 180);
@@ -1312,7 +1311,7 @@
         ctx.beginPath(); ctx.arc(sunX,sunY,7,0,Math.PI*2);
         ctx.fillStyle='rgba(255,255,240,0.85)'; ctx.fill();
 
-        // ── частицы ──
+        // частицы 
         for (let i = 0; i < 16; i++) {
             let px2 = (frame*0.15 + i*71) % (LOGICAL_W+100) - 50;
             let py2 = 40 + Math.sin(frame*0.018 + i*0.7)*35;
@@ -1320,7 +1319,7 @@
             ctx.beginPath(); ctx.arc(px2, py2, 1.5+Math.sin(frame*0.06+i)*0.8, 0, Math.PI*2); ctx.fill();
         }
 
-        // ── ЛЕВАЯ ЧАСТЬ ──
+        // ЛЕВАЯ ЧАСТЬ
         ctx.save();
         ctx.textAlign = 'left';
         let tx = Math.round(60*s);
@@ -1407,7 +1406,7 @@
         ctx.fillText('ПРОБЕЛ  /  КЛИК  /  ТАП', btnX, btnY + Math.round(46*s));
         ctx.restore();
 
-        // ── настройки ──
+        // настройки
         drawSettingsPanel();
     }
 
@@ -1477,7 +1476,7 @@
         ctx.fillText('20', px + pw - Math.round(14*s), py + Math.round(118*s));
     }
 
-    //флажек рекорда
+    // флажек рекорда
     function drawRecordFlag(currentX, camY) {
         if (!showFlag) return;
         
@@ -1527,7 +1526,7 @@
         }
     }
     
-    //отрисовка
+    // отрисовка
     function draw() {
         // Сбрасываем трансформ в начале каждого кадра — гарантирует правильный DPR-масштаб
         // даже если предыдущий save/restore где-то нарушил стек
@@ -1548,7 +1547,7 @@
         
         const camY = getCameraY();
         
-        //небо — биом
+        // небо — биом
         let grad = ctx.createLinearGradient(0, 0, 0, LOGICAL_H);
         for (let _s of biomSkyStops()) grad.addColorStop(_s[0], _s[1]);
         ctx.fillStyle = grad;
@@ -1561,7 +1560,7 @@
         ctx.fillStyle = _fogGrad;
         ctx.fillRect(0, LOGICAL_H*0.55, LOGICAL_W, LOGICAL_H*0.45);
 
-        //граница
+        // граница
         ctx.strokeStyle = 'rgba(255,255,255,0.15)';
         ctx.lineWidth = 2;
 
@@ -1576,7 +1575,7 @@
             ctx.fillText('ПРЕДЕЛ ВЫСОТЫ', LOGICAL_W - 160, 24 - camY);
         }
         
-    //солнце
+    // солнце
     let sunX = LOGICAL_W - 90;
     let sunY = 78;
 
@@ -1584,7 +1583,7 @@
     let rayRotation = frame * 0.01;
     let rayRotation2 = -frame * 0.006;
 
-    //атмосферное свечение (биом)
+    // атмосферное свечение (биом)
     let atmosphere = ctx.createRadialGradient(sunX, sunY, 20, sunX, sunY, 180);
     atmosphere.addColorStop(0, biomSunProp('glow'));
     atmosphere.addColorStop(0.5, 'rgba(0,0,0,0)');
@@ -1594,7 +1593,7 @@
     ctx.arc(sunX, sunY, 180, 0, Math.PI * 2);
     ctx.fill();
 
-    //лучи
+    // лучи
     // лучи солнца — цвет вычисляем один раз за пределами обоих циклов
     const _raysBase = biomSunProp('rays');
     function _rayColor(alpha) {
@@ -1619,7 +1618,7 @@
     }
     ctx.restore();
 
-    //лучи (второй набор, медленнее)
+    // лучи (второй набор, медленнее)
     ctx.save();
     ctx.translate(sunX, sunY);
     ctx.rotate(rayRotation2);
@@ -1638,7 +1637,7 @@
     }
     ctx.restore();
 
-    //внешний ореол
+    // внешний ореол
     let outer = ctx.createRadialGradient(sunX, sunY, 10, sunX, sunY, 85);
     outer.addColorStop(0,   biomSunPropA('color1', 0.35));
     outer.addColorStop(0.6, biomSunPropA('color2', 0.10));
@@ -1648,7 +1647,7 @@
     ctx.arc(sunX, sunY, 85 * pulse, 0, Math.PI * 2);
     ctx.fill();
     
-    //ядро солнца
+    // ядро солнца
     let core = ctx.createRadialGradient(sunX - 5, sunY - 5, 0, sunX, sunY, 38);
     core.addColorStop(0,    biomSunProp('color0'));
     core.addColorStop(0.25, biomSunProp('color1'));
@@ -1659,13 +1658,13 @@
     ctx.arc(sunX, sunY, 34 * pulse, 0, Math.PI * 2);
     ctx.fill();
 
-    //центральная яркая точка
+    // центральная яркая точка
     ctx.beginPath();
     ctx.arc(sunX, sunY, 7, 0, Math.PI * 2);
     ctx.fillStyle = 'rgba(255,255,240,0.85)';
     ctx.fill();
 
-    //крест-блик
+    // крест-блик
     ctx.beginPath();
     ctx.moveTo(sunX - 18, sunY);
     ctx.lineTo(sunX + 18, sunY);
@@ -1675,7 +1674,7 @@
     ctx.strokeStyle = 'rgba(255,255,210,0.35)';
     ctx.stroke();
 
-    //парящие частицы вокруг солнца
+    // парящие частицы вокруг солнца
     for (let i = 0; i < 8; i++) {
         let angle = (i / 8) * Math.PI * 2 + frame * 0.01;
         let radius = 48 + Math.sin(frame * 0.03 + i) * 8;
@@ -1687,7 +1686,7 @@
         ctx.fill();
     }
 
-    // ── фон: несколько слоёв глубины ──
+    // фон: несколько слоёв глубины
 
     // СЛОЙ 0: звёзды/частицы по всему небу
     {
@@ -1848,7 +1847,7 @@
         ctx.fillRect(0, hazeY2 - 20, LOGICAL_W, 90);
     }
 
-    // ── горы: одна вершина на сегмент, сплайн без волн ──
+    // горы: одна вершина на сегмент, сплайн без волн ──
     function buildMtnPoints(offsetY) {
         let pts = [];
         for (let seg of mountainSegments) {
@@ -2092,7 +2091,7 @@
             ctx.stroke();
         }
 
-    //игрок
+    // игрок
     ctx.save();
     ctx.shadowBlur = 0; // сброс перед игроком
     ctx.translate(player.x - cameraX, player.y - camY);
@@ -2104,7 +2103,7 @@
     ctx.shadowBlur = 12;
     ctx.shadowColor = 'rgba(0,0,0,0.18)';
 
-    //крыло
+    // крыло
     let wingGrad = ctx.createLinearGradient(-12, -10, 18, 6);
     wingGrad.addColorStop(0, '#FFF7EA');
     wingGrad.addColorStop(0.45, '#FFE1B6');
@@ -2118,7 +2117,7 @@
     ctx.fillStyle = wingGrad;
     ctx.fill();
 
-    //нижняя тень крыла 
+    // нижняя тень крыла 
     ctx.beginPath();
     ctx.moveTo(12, -3);
     ctx.quadraticCurveTo(2, 1, -6, 3);
@@ -2126,7 +2125,7 @@
     ctx.fillStyle = 'rgba(140, 90, 40, 0.14)';
     ctx.fill();
 
-    //стропы
+    // стропы
     ctx.beginPath();
     ctx.moveTo(-2, -8); ctx.lineTo(-6, 4);
     ctx.moveTo(4, -9);  ctx.lineTo(-1, 5);
@@ -2135,7 +2134,7 @@
     ctx.strokeStyle = '#B78D62';
     ctx.stroke();
 
-    //тело
+    // тело
     let bodyGrad = ctx.createLinearGradient(-5, 0, 4, 10);
     bodyGrad.addColorStop(0, '#F3C98E');
     bodyGrad.addColorStop(1, '#C9975E');
@@ -2145,7 +2144,7 @@
     ctx.fillStyle = bodyGrad;
     ctx.fill();
         
-    //голова
+    // голова
     let headGrad = ctx.createRadialGradient(-4, 0, 1, -2, 2, 5);
     headGrad.addColorStop(0, '#FFE2B7');
     headGrad.addColorStop(1, '#D9A66C');
@@ -2155,7 +2154,7 @@
     ctx.fillStyle = headGrad;
     ctx.fill();
 
-    //шарф
+    // шарф
     ctx.beginPath();
     ctx.moveTo(1, 4);
     ctx.quadraticCurveTo(-10, 5 + scarfSwing * 0.2, -18, 8 + scarfSwing);
@@ -2164,7 +2163,7 @@
     ctx.strokeStyle = '#FFF1D6';
     ctx.stroke();
 
-    //глаз
+    // глаз
     ctx.beginPath();
     ctx.arc(-4.4, 1.2, 1, 0, Math.PI * 2);
     ctx.fillStyle = '#FFFFFF';
@@ -2175,14 +2174,14 @@
     ctx.fillStyle = '#2C2C2C';
         ctx.fill();
 
-    //улыбка
+    // улыбка
     ctx.beginPath();
     ctx.arc(-3.2, 2.4, 1.2, 0.2, Math.PI - 0.2);
     ctx.lineWidth = 0.8;
     ctx.strokeStyle = '#8B5A2B';
     ctx.stroke();
 
-    //ноги
+    // ноги
     ctx.beginPath();
     ctx.moveTo(-3, 9);  
     ctx.lineTo(-7, 13 + flap * 0.2);
@@ -2192,7 +2191,7 @@
     ctx.strokeStyle = '#C79C6B';
     ctx.stroke();
 
-    //свет сверху
+    // свет сверху
     ctx.beginPath();
     ctx.moveTo(12, -5);
     ctx.quadraticCurveTo(2, -12, -5, -8);
@@ -2362,7 +2361,7 @@
     }
 
 
-    //управление
+    // управление
     function restartGame() {
         gameRunning = true;
         isDying = false;
@@ -2397,7 +2396,7 @@
         for (let i = 0; i < 2; i++) addThermalIfNeeded();
     }
     
-    //ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ДЛЯ УПРАВЛЕНИЯ
+    // ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ДЛЯ УПРАВЛЕНИЯ
 
     function getCanvasPos(e) {
         // rect уже в CSS-пикселях = logical coords (ctx масштабирован через DPR)
@@ -2520,7 +2519,7 @@
         canvas.addEventListener('contextmenu', (e) => e.preventDefault());
     }
 
-    //запуск
+    // запуск
     resizeCanvas();
     resetPlayerPos();
     window.addEventListener('resize', () => {
