@@ -79,12 +79,6 @@
     let deathSpinDir       = 1;     // направление кувырка (зависит от скорости на момент смерти)
     const DEATH_ANIM_DURATION = 1.1; // сек — как долго крутится/падает перед Game Over
 
-    // ── Вступительная анимация: разбег по горе и прыжок перед стартом геймплея ──
-    let introPlaying = false;
-    let introTimer   = 0;
-    const INTRO_DURATION  = 2.0;  // сек — общая длительность разбега+прыжка
-    const INTRO_RUN_SHARE = 0.55; // доля времени на разбег (остальное — прыжок/взлёт)
-
     function resetPlayerPos() {
         player.x = LOGICAL_W * 0.35;
         player.y = LOGICAL_H * 0.55;
@@ -775,7 +769,6 @@
         showWelcome = false;
         gameRunning = true;
         restartGame();
-        startIntroAnimation(); // разбег + прыжок с горы перед началом геймплея
     }
     
     // горы
@@ -1048,159 +1041,12 @@
         }
     }
 
-    function easeOutCubic(x) { return 1 - Math.pow(1 - x, 3); }
-
-    // ── Стартовый трамплин: простая декоративная площадка с опорами ──
-    // Полностью независим от процедурных гор — не завязан на mountainSegments,
-    // поэтому никогда не "рвётся" из-за случайной генерации рельефа.
-    // Существует только в начале игры и один раз уходит за левый край экрана навсегда.
-    let launchPlatform = null;
-    const LAUNCH_PLATFORM_X = 30;   // мировая X — левый край площадки
-    const LAUNCH_PLATFORM_W = 150;  // ширина площадки
-
-    function createLaunchPlatform() {
-        launchPlatform = {
-            x: LAUNCH_PLATFORM_X,
-            width: LAUNCH_PLATFORM_W,
-            y: LOGICAL_H * 0.42 // высота настила — фиксированная, не зависит от гор
-        };
-    }
-
-    function drawLaunchPlatform() {
-        if (!launchPlatform) return;
-        const camY = getCameraY();
-        const x = launchPlatform.x - cameraX;
-        const y = launchPlatform.y - camY;
-        const w = launchPlatform.width;
-
-        // ушла за левый край экрана — убираем насовсем, больше никогда не появится
-        if (x + w < -100) { launchPlatform = null; return; }
-
-        ctx.save();
-
-        // опоры (уходят вниз за пределы экрана)
-        ctx.strokeStyle = '#4a3320';
-        ctx.lineWidth = 7;
-        ctx.lineCap = 'round';
-        ctx.beginPath();
-        ctx.moveTo(x + w * 0.16, y + 9);
-        ctx.lineTo(x + w * 0.02, LOGICAL_H + 80);
-        ctx.stroke();
-        ctx.beginPath();
-        ctx.moveTo(x + w * 0.84, y + 9);
-        ctx.lineTo(x + w * 0.98, LOGICAL_H + 80);
-        ctx.stroke();
-
-        // диагональная распорка между опорами
-        ctx.lineWidth = 4;
-        ctx.beginPath();
-        ctx.moveTo(x + w * 0.10, y + 46);
-        ctx.lineTo(x + w * 0.90, y + 62);
-        ctx.stroke();
-
-        // тень под настилом
-        ctx.fillStyle = 'rgba(0,0,0,0.22)';
-        ctx.fillRect(x, y + 9, w, 4);
-
-        // деревянный настил
-        ctx.fillStyle = '#8a6540';
-        ctx.fillRect(x, y - 2, w, 11);
-        ctx.fillStyle = '#6b4c2e';
-        for (let i = 0; i < 7; i++) {
-            ctx.fillRect(x + i * (w / 7), y - 2, 2, 11); // стыки досок
-        }
-        // светлая кромка сверху (блик)
-        ctx.fillStyle = 'rgba(255,240,210,0.25)';
-        ctx.fillRect(x, y - 2, w, 2);
-
-        ctx.restore();
-    }
-
-    // высота настила трамплина, на котором начинается разбег
-    function getIntroGroundY() {
-        if (launchPlatform) return launchPlatform.y - player.radius - 4;
-        return LOGICAL_H * 0.42 - player.radius - 4;
-    }
-
-    // запускает разбег+прыжок; вызывается сразу после restartGame()
-    function startIntroAnimation() {
-        createLaunchPlatform();
-
-        introPlaying = true;
-        introTimer   = 0;
-
-        player.vx    = 0;
-        player.vy    = 0;
-        player.angle = 0;
-        player.x     = LAUNCH_PLATFORM_X + 12; // начало настила
-        player.y     = getIntroGroundY();
-
-        // та же формула камеры, что и в обычном геймплее — без рывка в конце интро
-        cameraX       = player.x - LOGICAL_W * 0.35;
-        cameraYOffset = player.y - LOGICAL_H / 2;
-    }
-
-    // сама вступительная анимация: разбег по трамплину → прыжок → плавный переход в геймплей
-    function updateIntroAnimation(dt, delta) {
-        introTimer += delta;
-        const t = Math.min(1, introTimer / INTRO_DURATION);
-
-        const groundY   = getIntroGroundY();
-        const runStartX = LAUNCH_PLATFORM_X + 12;
-        const runEndX   = LAUNCH_PLATFORM_X + LAUNCH_PLATFORM_W - 10; // край настила — точка отрыва
-        const glideX    = LOGICAL_W * 0.35; // обычная стартовая позиция геймплея (мировая)
-        const glideY    = LOGICAL_H * 0.55;
-
-        if (t < INTRO_RUN_SHARE) {
-            // ФАЗА 1: разбег по настилу — стоит на трамплине, ускоряется
-            const rt     = t / INTRO_RUN_SHARE;
-            const eased  = easeOutCubic(rt);
-            player.x     = runStartX + (runEndX - runStartX) * eased;
-            player.y     = groundY;
-            player.vx    = 4.6 * eased;
-            player.vy    = 0;
-            player.angle = -0.08 * eased; // лёгкий наклон вперёд при разгоне
-        } else {
-            // ФАЗА 2: слёт с трамплина — плавно вперёд и вниз, лёгкий подброс в момент отрыва
-            const jt    = (t - INTRO_RUN_SHARE) / (1 - INTRO_RUN_SHARE);
-            const eased = easeOutCubic(jt);
-            const arc   = Math.sin(jt * Math.PI) * (LOGICAL_H * 0.045); // лёгкий хлопок вверх в момент отрыва
-
-            player.x     = runEndX + (glideX - runEndX) * eased;
-            player.y     = groundY + (glideY - groundY) * eased - arc;
-            player.vx    = 4.6 + (3.8 - 4.6) * eased;
-            player.vy    = -1.3 * (1 - jt) + 0.5 * jt; // короткий отрыв → выравнивание в планирование
-            player.angle = -0.22 * Math.sin(jt * Math.PI * 0.85);
-        }
-
-        // та же формула камеры, что использует обычный геймплей — без рывка при завершении интро
-        cameraX        = player.x - LOGICAL_W * 0.35;
-        cameraYOffset += (player.y - LOGICAL_H / 2 - cameraYOffset) * 0.09;
-
-        updateWindSound(); // лёгкий нарастающий свист ветра синхронно с разгоном
-
-        if (introTimer >= INTRO_DURATION) {
-            // жёстко фиксируем ровно те параметры, с которых обычно стартует геймплей
-            player.x     = glideX;
-            player.y     = glideY;
-            player.vx    = 3.8;
-            player.vy    = 0;
-            player.angle = 0;
-            introPlaying = false;
-        }
-    }
-
     // обновление
     function updateGame(delta) {
         if (!gameRunning) return;
 
         // нормализуем delta (чтобы при 60 FPS всё работало как раньше)
         let dt = Math.min(1.5, delta * 60);
-
-        if (introPlaying) {
-            updateIntroAnimation(dt, delta);
-            return;
-        }
 
         if (isDying) {
             updateDeathTumble(dt, delta);
@@ -1701,11 +1547,18 @@
         
         const camY = getCameraY();
         
-        // небо — биом
-        let grad = ctx.createLinearGradient(0, 0, 0, LOGICAL_H);
-        for (let _s of biomSkyStops()) grad.addColorStop(_s[0], _s[1]);
-        ctx.fillStyle = grad;
-        ctx.fillRect(0, 0, LOGICAL_W, LOGICAL_H);
+        // небо — биом (кеш, не пересоздаём каждый кадр)
+        let _curBiomT = biomT(), _curBiomDir = getCycleDir();
+        if (!draw._skyC || draw._skyT !== _curBiomT || draw._skyD !== _curBiomDir) {
+            draw._skyT = _curBiomT; draw._skyD = _curBiomDir;
+            draw._skyC = document.createElement('canvas');
+            draw._skyC.width = 2; draw._skyC.height = LOGICAL_H;
+            let _sc = draw._skyC.getContext('2d');
+            let _sg = _sc.createLinearGradient(0, 0, 0, LOGICAL_H);
+            for (let _s of biomSkyStops()) _sg.addColorStop(_s[0], _s[1]);
+            _sc.fillStyle = _sg; _sc.fillRect(0, 0, 2, LOGICAL_H);
+        }
+        ctx.drawImage(draw._skyC, 0, 0, LOGICAL_W, LOGICAL_H);
 
         // туман у горизонта (биомный)
         let _fogGrad = ctx.createLinearGradient(0, LOGICAL_H*0.55, 0, LOGICAL_H);
@@ -2170,6 +2023,7 @@
             ctx.stroke();
             ctx.restore();
         }
+        ctx.filter = 'none';  // гарантированный сброс filter после облаков
 
         //термики
         for (let t of thermals) {
@@ -2245,12 +2099,11 @@
             ctx.stroke();
         }
 
-    // стартовый трамплин (виден только в начале игры, потом уходит за кадр навсегда)
-    drawLaunchPlatform();
-
     // игрок
     ctx.save();
-    ctx.shadowBlur = 0; // сброс перед игроком
+    ctx.globalAlpha = 1;
+    ctx.filter = 'none';
+    ctx.shadowBlur = 0;
     ctx.translate(player.x - cameraX, player.y - camY);
     ctx.rotate(player.angle);
 
@@ -2523,7 +2376,6 @@
         gameRunning = true;
         isDying = false;
         deathTimer = 0;
-        launchPlatform = null; // рестарт после смерти — без интро, трамплину тут не место
         score = 0;
         resetPlayerPos();
         player.vx = 3.8;
