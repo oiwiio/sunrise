@@ -29,14 +29,19 @@
 
         deathTimer += delta;
         if (deathTimer >= DEATH_ANIM_DURATION) {
-            isDying     = false;
-            gameRunning = false; // теперь показываем экран "ПОКИНУЛ НЕБО"
+            isDying      = false;
+            gameRunning  = false;
+            gameOverTimer = 0;  // запускаем fade-in экрана смерти
         }
     }
 
     // обновление
     function updateGame(delta) {
-        if (!gameRunning) return;
+        if (!gameRunning) {
+            // тикаем таймер fade-in экрана смерти
+            if (gameOverTimer < 1) gameOverTimer = Math.min(1, gameOverTimer + delta / 0.35);
+            return;
+        }
 
         // нормализуем delta (чтобы при 60 FPS всё работало как раньше)
         let dt = Math.min(1.5, delta * 60);

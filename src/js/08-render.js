@@ -762,31 +762,97 @@
         ctx.fillStyle = "#f7e5c2";
         
         
-        if (!gameRunning) {
-            ctx.font = `bold ${Math.round(34*s)}px monospace`;
-            ctx.fillStyle = '#FFF3DF';
-            ctx.fillText('ПОКИНУЛ НЕБО', LOGICAL_W / 2 - Math.round(150*s), LOGICAL_H / 2 - Math.round(40*s));
-            ctx.font = `${Math.round(18*s)}px monospace`;
-            ctx.fillStyle = '#FFCF9A';
-            ctx.fillText('НАЖМИ ПРОБЕЛ / КЛИК / ТАП → НОВЫЙ ПОЛЁТ', LOGICAL_W / 2 - Math.round(210*s), LOGICAL_H / 2 + Math.round(40*s));
-            
-            // звезда на месте рекорда
+        if (!gameRunning && !isDying) {
+            const alpha = Math.min(1, typeof gameOverTimer !== 'undefined' ? gameOverTimer : 1);
+            ctx.globalAlpha = alpha;
+            const cx = LOGICAL_W / 2;
+            const cy = LOGICAL_H / 2;
+            const isRecord = Math.floor(score) >= highScore && highScore > 0;
+
+            // затемнение фона
+            ctx.fillStyle = 'rgba(5, 3, 15, 0.62)';
+            ctx.fillRect(0, 0, LOGICAL_W, LOGICAL_H);
+
+            // карточка по центру
+            const cw = Math.round(340 * s);
+            const ch = Math.round(220 * s);
+            const cx0 = cx - cw / 2;
+            const cy0 = cy - ch / 2;
+
+            // фон карточки
+            ctx.fillStyle = 'rgba(10, 8, 22, 0.82)';
+            ctx.beginPath();
+            ctx.roundRect(cx0, cy0, cw, ch, Math.round(16*s));
+            ctx.fill();
+            ctx.strokeStyle = isRecord
+                ? 'rgba(255,210,80,0.45)'
+                : 'rgba(255,217,181,0.12)';
+            ctx.lineWidth = isRecord ? 1.5 : 1;
+            ctx.stroke();
+
+            // заголовок
+            ctx.save();
+            ctx.textAlign = 'center';
+            ctx.font = `bold ${Math.round(22*s)}px monospace`;
+            ctx.fillStyle = isRecord ? '#FFD966' : '#FFF3DF';
+            ctx.shadowBlur = isRecord ? 12 : 0;
+            ctx.shadowColor = 'rgba(255,210,80,0.5)';
+            ctx.fillText(isRecord ? '✦  НОВЫЙ РЕКОРД  ✦' : 'ПОКИНУЛ НЕБО', cx, cy0 + Math.round(42*s));
+            ctx.shadowBlur = 0;
+
+            // счёт
+            ctx.font = `bold ${Math.round(44*s)}px monospace`;
+            ctx.fillStyle = '#FFF9E8';
+            ctx.fillText(Math.floor(score), cx, cy0 + Math.round(102*s));
+
+            // подпись под счётом
+            ctx.font = `${Math.round(10*s)}px monospace`;
+            ctx.fillStyle = 'rgba(255,217,181,0.4)';
+            ctx.fillText('ОЧКОВ НАБРАНО', cx, cy0 + Math.round(118*s));
+
+            // рекорд (если не новый)
+            if (!isRecord && highScore > 0) {
+                ctx.font = `${Math.round(11*s)}px monospace`;
+                ctx.fillStyle = 'rgba(255,210,140,0.55)';
+                ctx.fillText('РЕКОРД  ' + highScore + '  ✦', cx, cy0 + Math.round(142*s));
+            }
+
+            // разделитель
+            ctx.beginPath();
+            ctx.moveTo(cx0 + Math.round(24*s), cy0 + Math.round(158*s));
+            ctx.lineTo(cx0 + cw - Math.round(24*s), cy0 + Math.round(158*s));
+            ctx.strokeStyle = 'rgba(255,217,181,0.1)';
+            ctx.lineWidth = 1;
+            ctx.stroke();
+
+            // кнопка рестарта — пульсирует
+            let bp = 0.88 + Math.sin(frame * 0.07) * 0.12;
+            ctx.font = `${Math.round(11*s)}px monospace`;
+            ctx.fillStyle = `rgba(255,200,120,${0.5 + Math.sin(frame*0.07)*0.2})`;
+            ctx.fillText('ПРОБЕЛ  /  КЛИК  /  ТАП  →  НОВЫЙ ПОЛЁТ', cx, cy0 + Math.round(185*s));
+
+            ctx.restore();
+
+            // звезда на месте рекорда в мире
             if (highScorePosition > 0) {
                 const starX = highScorePosition - cameraX;
-                const starY = highScorePositionY - camY;  // нужна будет отдельная переменная
-                
+                const starY = highScorePositionY - camY;
                 if (starX > -50 && starX < LOGICAL_W + 50) {
-                    ctx.font = '24px monospace';
+                    ctx.save();
+                    ctx.font = `${Math.round(20*s)}px monospace`;
                     ctx.fillStyle = '#FFD966';
-                    ctx.shadowBlur = 4;
-                    ctx.fillText('✦', starX - 10, starY - 20);
-                    
-                    ctx.font = '10px monospace';
-                    ctx.fillStyle = '#c9b28b';
-                    ctx.fillText('рекорд был здесь', starX - 55, starY - 5);
+                    ctx.shadowBlur = 6;
+                    ctx.shadowColor = 'rgba(255,210,80,0.6)';
+                    ctx.textAlign = 'center';
+                    ctx.fillText('✦', starX, starY - 18);
+                    ctx.font = `${Math.round(9*s)}px monospace`;
+                    ctx.fillStyle = 'rgba(201,178,139,0.6)';
                     ctx.shadowBlur = 0;
+                    ctx.fillText('рекорд', starX, starY - 4);
+                    ctx.restore();
                 }
             }
+            ctx.globalAlpha = 1;
         }
 
         ctx.restore(); // конец HUD

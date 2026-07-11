@@ -177,7 +177,7 @@
         if (timestamp - lastUpdate >= FRAME_TIME) {
             let delta = Math.min(0.05, (timestamp - lastUpdate) / 1000);
             lastUpdate = timestamp;
-            if (gameRunning && !showWelcome) updateGame(delta);
+            if (!showWelcome) updateGame(delta);
         }
         draw();
     }
