@@ -1,4 +1,3 @@
-// ── 06-update-loop.js ────────────────────────────────────────
 // Главный игровой тик: triggerDeath/updateDeathTumble, updateGame().
 // Тут вся физика и коллизии одного кадра.
 // Зависит от: всё, что выше (02–05) + 04-audio.js (playThermalSound и т.д.).
@@ -71,8 +70,8 @@
         cameraX = player.x - LOGICAL_W * 0.35;
         if (cameraX < 0) cameraX = 0;
         
-        // границы по вертикали
-        if (player.y < 32) {
+        // границы по вертикали — привязаны к LOGICAL_H как в рендере
+        if (player.y < Math.round(LOGICAL_H * 0.08)) {
             triggerDeath();
             return;
         }
@@ -227,5 +226,3 @@
         updateWindSound();
         updateCameraY();
     }
-
-    

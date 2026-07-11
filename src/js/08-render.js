@@ -1,4 +1,3 @@
-// ── 08-render.js ─────────────────────────────────────────────
 // draw() и всё, что рисует кадр: небо, горы, солнце, игрок, HUD.
 // Самый большой файл — чисто отрисовка, почти без игровой логики.
 // Зависит от: всё выше (01–07).
@@ -45,18 +44,21 @@
         ctx.fillRect(0, LOGICAL_H*0.55, LOGICAL_W, LOGICAL_H*0.45);
 
         // граница
-        ctx.strokeStyle = 'rgba(255,255,255,0.15)';
-        ctx.lineWidth = 2;
+        const HEIGHT_LIMIT = Math.round(LOGICAL_H * 0.08);
 
+        ctx.strokeStyle = 'rgba(255,255,255,0.75)';
+        ctx.lineWidth = 1.5;
+        ctx.setLineDash([12, 8]);
         ctx.beginPath();
-        ctx.moveTo(0, 32 - camY);
-        ctx.lineTo(LOGICAL_W, 32 - camY);
+        ctx.moveTo(0, HEIGHT_LIMIT - camY);
+        ctx.lineTo(LOGICAL_W, HEIGHT_LIMIT - camY);
         ctx.stroke();
+        ctx.setLineDash([]);
 
-        ctx.fillStyle = 'rgba(255,255,255,0.4)';
-        ctx.font = '12px monospace';
-        if (24 - camY > 20 && 24 - camY < LOGICAL_H - 20) {
-            ctx.fillText('ПРЕДЕЛ ВЫСОТЫ', LOGICAL_W - 160, 24 - camY);
+        ctx.fillStyle = 'rgba(255,255,255,0.7)';
+        ctx.font = `${Math.round(11 * UI_SCALE)}px monospace`;
+        if (HEIGHT_LIMIT - 10 - camY > 10 && HEIGHT_LIMIT - 10 - camY < LOGICAL_H - 10) {
+            ctx.fillText('▲  ПРЕДЕЛ ВЫСОТЫ', Math.round(LOGICAL_W * 0.5 - 70), HEIGHT_LIMIT - 10 - camY);
         }
         
     // солнце
@@ -846,5 +848,3 @@
         // конец кадра — сбрасываем трансформ для безопасности
         ctx.setTransform(_DPR, 0, 0, _DPR, 0, 0);
     }
-
-
