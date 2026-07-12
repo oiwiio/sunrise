@@ -53,15 +53,14 @@
 
         //управление по вертикали
         if (isPressing) {
-            //пикирование
-            player.vy += 0.32 * dt;
-            player.angle = Math.min(0.65, player.angle + 0.04 * dt); 
+            player.vy += 0.26 * dt;                                    // пикирование — чуть мягче
+            player.angle = Math.min(0.65, player.angle + 0.06 * dt);  // быстрее отклик
         } else {
-            player.vy -= 0.13 * dt;
-            player.angle = Math.max(-0.45, player.angle - 0.03 * dt); 
+            player.vy -= 0.20 * dt;                                    // подъём — заметно сильнее
+            player.angle = Math.max(-0.45, player.angle - 0.05 * dt); // быстрее отклик
         }
         
-        player.vy += GRAVITY * dt;
+        player.vy += GRAVITY * 0.75 * dt;  // гравитация чуть слабее — ощущение парения
         if (player.vy > MAX_VY) player.vy = MAX_VY;
         if (player.vy < -4.6) player.vy = -4.6;
         player.y += player.vy * dt;
