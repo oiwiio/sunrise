@@ -206,9 +206,9 @@
         // счёт
         let isMaxSpeed = (player.vx > MAX_VX_GROWTH - 0.8);
         if (isMaxSpeed) {
-            score += 0.5 * dt;
-            let speedBonus = Math.floor(player.vx * 0.3 * dt);
-            score += Math.min(2, speedBonus);
+            score += 0.3 * dt;
+            let speedBonus = Math.floor(player.vx * 0.18 * dt);
+            score += Math.min(1.2, speedBonus);
         }
         
         // плавный возврат угла

@@ -61,115 +61,145 @@
             ctx.fillText('▲  ПРЕДЕЛ ВЫСОТЫ', Math.round(LOGICAL_W * 0.5 - 70), HEIGHT_LIMIT - 10 - camY);
         }
         
-    // солнце
+    // солнце / луна — зависит от биома
     let sunX = LOGICAL_W - 90;
     let sunY = 78;
-
     let pulse = 0.95 + Math.sin(frame * 0.03) * 0.05;
-    let rayRotation = frame * 0.01;
-    let rayRotation2 = -frame * 0.006;
 
-    // атмосферное свечение (биом)
-    let atmosphere = ctx.createRadialGradient(sunX, sunY, 20, sunX, sunY, 180);
-    atmosphere.addColorStop(0, biomSunProp('glow'));
-    atmosphere.addColorStop(0.5, 'rgba(0,0,0,0)');
-    atmosphere.addColorStop(1, 'rgba(0,0,0,0)');
-    ctx.fillStyle = atmosphere;
-    ctx.beginPath();
-    ctx.arc(sunX, sunY, 180, 0, Math.PI * 2);
-    ctx.fill();
+    // nightT: 0 = день, 1 = ночь
+    const nightT = (getCurBiom().id === 'night')
+        ? Math.min(1, 1 - biomT())       // переходим В ночь
+        : Math.min(1, biomT());           // переходим ИЗ ночи — обратно день
+    const isNight = getCurBiom().id === 'night' || (getNextBiom && getNextBiom().id === 'night' && biomT() > 0.5);
 
-    // лучи
-    // лучи солнца — цвет вычисляем один раз за пределами обоих циклов
-    const _raysBase = biomSunProp('rays');
-    function _rayColor(alpha) {
-        return toRgba(_raysBase, alpha);
-    }
-
-    ctx.save();
-    ctx.translate(sunX, sunY);
-    ctx.rotate(rayRotation);
-    for (let i = 0; i < 10; i++) {
-        let angle = (i / 10) * Math.PI * 2;
+    // ── СОЛНЦЕ (дневная сторона) ──
+    if (nightT < 1) {
+        const sunAlpha = 1 - nightT;
         ctx.save();
-        ctx.rotate(angle);
-        let len = 95 + Math.sin(frame * 0.04 + i) * 12;
+        ctx.globalAlpha = sunAlpha;
+
+        let rayRotation  = frame * 0.01;
+        let rayRotation2 = -frame * 0.006;
+
+        let atmosphere = ctx.createRadialGradient(sunX, sunY, 20, sunX, sunY, 180);
+        atmosphere.addColorStop(0, biomSunProp('glow'));
+        atmosphere.addColorStop(0.5, 'rgba(0,0,0,0)');
+        atmosphere.addColorStop(1,   'rgba(0,0,0,0)');
+        ctx.fillStyle = atmosphere;
+        ctx.beginPath(); ctx.arc(sunX, sunY, 180, 0, Math.PI*2); ctx.fill();
+
+        const _raysBase = biomSunProp('rays');
+        function _rayColor(alpha) { return toRgba(_raysBase, alpha); }
+
+        ctx.save(); ctx.translate(sunX, sunY); ctx.rotate(rayRotation);
+        for (let i = 0; i < 10; i++) {
+            ctx.save(); ctx.rotate((i/10)*Math.PI*2);
+            let len = 95 + Math.sin(frame*0.04+i)*12;
+            ctx.beginPath(); ctx.moveTo(30,0); ctx.lineTo(len,-5); ctx.lineTo(len,5);
+            ctx.fillStyle = _rayColor(0.1+Math.sin(frame*0.02+i)*0.05); ctx.fill();
+            ctx.restore();
+        }
+        ctx.restore();
+
+        ctx.save(); ctx.translate(sunX, sunY); ctx.rotate(rayRotation2);
+        for (let i = 0; i < 6; i++) {
+            ctx.save(); ctx.rotate((i/6)*Math.PI*2);
+            let len = 65 + Math.sin(frame*0.05+i)*8;
+            ctx.beginPath(); ctx.moveTo(22,0); ctx.lineTo(len,-3); ctx.lineTo(len,3);
+            ctx.fillStyle = _rayColor(0.12+Math.sin(frame*0.03+i)*0.04); ctx.fill();
+            ctx.restore();
+        }
+        ctx.restore();
+
+        let outer = ctx.createRadialGradient(sunX, sunY, 10, sunX, sunY, 85);
+        outer.addColorStop(0,   biomSunPropA('color1', 0.35));
+        outer.addColorStop(0.6, biomSunPropA('color2', 0.10));
+        outer.addColorStop(1,   'rgba(0,0,0,0)');
+        ctx.fillStyle = outer;
+        ctx.beginPath(); ctx.arc(sunX, sunY, 85*pulse, 0, Math.PI*2); ctx.fill();
+
+        let core = ctx.createRadialGradient(sunX-5, sunY-5, 0, sunX, sunY, 38);
+        core.addColorStop(0,    biomSunProp('color0'));
+        core.addColorStop(0.25, biomSunProp('color1'));
+        core.addColorStop(0.7,  biomSunProp('color2'));
+        core.addColorStop(1,    biomSunProp('color3'));
+        ctx.fillStyle = core;
+        ctx.beginPath(); ctx.arc(sunX, sunY, 34*pulse, 0, Math.PI*2); ctx.fill();
+
+        ctx.beginPath(); ctx.arc(sunX, sunY, 7, 0, Math.PI*2);
+        ctx.fillStyle = 'rgba(255,255,240,0.85)'; ctx.fill();
+
         ctx.beginPath();
-        ctx.moveTo(30, 0);
-        ctx.lineTo(len, -5);
-        ctx.lineTo(len, 5);
-        ctx.fillStyle = _rayColor(0.1 + Math.sin(frame * 0.02 + i) * 0.05);
-        ctx.fill();
+        ctx.moveTo(sunX-18, sunY); ctx.lineTo(sunX+18, sunY);
+        ctx.moveTo(sunX, sunY-18); ctx.lineTo(sunX, sunY+18);
+        ctx.lineWidth = 1.5; ctx.strokeStyle = 'rgba(255,255,210,0.35)'; ctx.stroke();
+
+        for (let i = 0; i < 8; i++) {
+            let angle = (i/8)*Math.PI*2 + frame*0.01;
+            let radius = 48 + Math.sin(frame*0.03+i)*8;
+            let px = sunX + Math.cos(angle)*radius;
+            let py = sunY + Math.sin(angle)*radius;
+            ctx.beginPath(); ctx.arc(px, py, 1.8+Math.sin(frame*0.04+i)*0.4, 0, Math.PI*2);
+            ctx.fillStyle = `rgba(255,230,160,${0.2+Math.sin(frame*0.05+i)*0.1})`; ctx.fill();
+        }
         ctx.restore();
     }
-    ctx.restore();
 
-    // лучи (второй набор, медленнее)
-    ctx.save();
-    ctx.translate(sunX, sunY);
-    ctx.rotate(rayRotation2);
-    for (let i = 0; i < 6; i++) {
-        let angle = (i / 6) * Math.PI * 2;
+    // ── ЛУНА (ночная сторона) ──
+    if (nightT > 0) {
+        const moonAlpha = nightT;
+        const moonR = 28 * pulse;
+        const moonX = sunX;
+        const moonY = sunY;
+
         ctx.save();
-        ctx.rotate(angle);
-        let len = 65 + Math.sin(frame * 0.05 + i) * 8;
+        ctx.globalAlpha = moonAlpha;
+
+        // мягкое свечение вокруг луны
+        let moonGlow = ctx.createRadialGradient(moonX, moonY, moonR*0.5, moonX, moonY, moonR*4);
+        moonGlow.addColorStop(0,   'rgba(180,200,255,0.12)');
+        moonGlow.addColorStop(0.5, 'rgba(120,150,255,0.05)');
+        moonGlow.addColorStop(1,   'rgba(0,0,0,0)');
+        ctx.fillStyle = moonGlow;
+        ctx.beginPath(); ctx.arc(moonX, moonY, moonR*4, 0, Math.PI*2); ctx.fill();
+
+        // тело луны
+        let moonBody = ctx.createRadialGradient(moonX-4, moonY-4, 0, moonX, moonY, moonR);
+        moonBody.addColorStop(0,   '#f0f4ff');
+        moonBody.addColorStop(0.5, '#d8e4f8');
+        moonBody.addColorStop(1,   '#b0c0e8');
+        ctx.fillStyle = moonBody;
+        ctx.beginPath(); ctx.arc(moonX, moonY, moonR, 0, Math.PI*2); ctx.fill();
+
+        // серп — тёмный круг смещён, создаёт форму месяца
+        ctx.save();
+        ctx.globalCompositeOperation = 'destination-out';
         ctx.beginPath();
-        ctx.moveTo(22, 0);
-        ctx.lineTo(len, -3);
-        ctx.lineTo(len, 3);
-        ctx.fillStyle = _rayColor(0.12 + Math.sin(frame * 0.03 + i) * 0.04);
+        ctx.arc(moonX + moonR*0.55, moonY - moonR*0.05, moonR*0.85, 0, Math.PI*2);
+        ctx.fillStyle = 'rgba(0,0,0,0.92)';
         ctx.fill();
         ctx.restore();
-    }
-    ctx.restore();
 
-    // внешний ореол
-    let outer = ctx.createRadialGradient(sunX, sunY, 10, sunX, sunY, 85);
-    outer.addColorStop(0,   biomSunPropA('color1', 0.35));
-    outer.addColorStop(0.6, biomSunPropA('color2', 0.10));
-    outer.addColorStop(1,   'rgba(0,0,0,0)');
-    ctx.fillStyle = outer;
-    ctx.beginPath();
-    ctx.arc(sunX, sunY, 85 * pulse, 0, Math.PI * 2);
-    ctx.fill();
-    
-    // ядро солнца
-    let core = ctx.createRadialGradient(sunX - 5, sunY - 5, 0, sunX, sunY, 38);
-    core.addColorStop(0,    biomSunProp('color0'));
-    core.addColorStop(0.25, biomSunProp('color1'));
-    core.addColorStop(0.7,  biomSunProp('color2'));
-    core.addColorStop(1,    biomSunProp('color3'));      
-    ctx.fillStyle = core;
-    ctx.beginPath();
-    ctx.arc(sunX, sunY, 34 * pulse, 0, Math.PI * 2);
-    ctx.fill();
-
-    // центральная яркая точка
-    ctx.beginPath();
-    ctx.arc(sunX, sunY, 7, 0, Math.PI * 2);
-    ctx.fillStyle = 'rgba(255,255,240,0.85)';
-    ctx.fill();
-
-    // крест-блик
-    ctx.beginPath();
-    ctx.moveTo(sunX - 18, sunY);
-    ctx.lineTo(sunX + 18, sunY);
-    ctx.moveTo(sunX, sunY - 18);
-    ctx.lineTo(sunX, sunY + 18);
-    ctx.lineWidth = 1.5;
-    ctx.strokeStyle = 'rgba(255,255,210,0.35)';
-    ctx.stroke();
-
-    // парящие частицы вокруг солнца
-    for (let i = 0; i < 8; i++) {
-        let angle = (i / 8) * Math.PI * 2 + frame * 0.01;
-        let radius = 48 + Math.sin(frame * 0.03 + i) * 8;
-        let px = sunX + Math.cos(angle) * radius;
-        let py = sunY + Math.sin(angle) * radius;
+        // ободок серпа — тонкое свечение по краю
         ctx.beginPath();
-        ctx.arc(px, py, 1.8 + Math.sin(frame * 0.04 + i) * 0.4, 0, Math.PI * 2);
-        ctx.fillStyle = `rgba(255,230,160,${0.2 + Math.sin(frame * 0.05 + i) * 0.1})`;
-        ctx.fill();
+        ctx.arc(moonX, moonY, moonR + 1.5, 0, Math.PI*2);
+        ctx.strokeStyle = 'rgba(200,220,255,0.25)';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        // звёзды рядом с луной
+        for (let i = 0; i < 5; i++) {
+            let angle = (i / 5) * Math.PI * 2 + frame * 0.004;
+            let dist  = moonR * (2.2 + (i % 2) * 0.8);
+            let sx2 = moonX + Math.cos(angle) * dist;
+            let sy2 = moonY + Math.sin(angle) * dist;
+            let sa  = 0.4 + Math.sin(frame*0.05 + i*1.3) * 0.3;
+            let sr  = 0.8 + (i % 3) * 0.5;
+            ctx.beginPath(); ctx.arc(sx2, sy2, sr, 0, Math.PI*2);
+            ctx.fillStyle = `rgba(220,230,255,${sa})`; ctx.fill();
+        }
+
+        ctx.restore();
     }
 
     // фон: несколько слоёв глубины
@@ -568,13 +598,33 @@
         // частицы биома (птицы, угли, звёзды, молнии)
         drawBiomParticles(camY);
 
-        // линии ветра
+        // линии ветра — изогнутые, с завитком и затуханием
         for (let p of windParticles) {
+            const curl  = p.curl  || 0;
+            const phase = p.phase || 0;
+            const len   = p.length;
+            const alpha = p.life * p.opacity * 0.65;
+
+            // контрольная точка Безье — создаёт изгиб
+            // завиток: середина линии смещена вверх/вниз на curl + лёгкая волна
+            const wave  = Math.sin(frame * 0.08 + phase) * (p.type === 'fast' ? 5 : 2);
+            const cpX   = p.x - len * 0.5;
+            const cpY   = p.y + curl * 0.5 + wave;
+            const endX  = p.x - len;
+            const endY  = p.y - p.vy * 2 + curl;
+
+            // рисуем через градиент: хвост прозрачный, голова яркая
+            const grad = ctx.createLinearGradient(p.x, p.y, endX, endY);
+            const col  = biomColorA('windColor', alpha);
+            grad.addColorStop(0, col);
+            grad.addColorStop(1, 'rgba(255,255,255,0)');
+
             ctx.beginPath();
             ctx.moveTo(p.x, p.y);
-            ctx.lineTo(p.x - p.length, p.y - p.vy * 2);
-            ctx.lineWidth = p.width;
-            ctx.strokeStyle = biomColorA('windColor', p.life*p.opacity*0.6);
+            ctx.quadraticCurveTo(cpX, cpY, endX, endY);
+            ctx.lineWidth  = p.width * (0.8 + p.life * 0.4);
+            ctx.strokeStyle = grad;
+            ctx.lineCap = 'round';
             ctx.stroke();
         }
 
@@ -763,8 +813,6 @@
         
         
         if (!gameRunning && !isDying) {
-            const alpha = Math.min(1, typeof gameOverTimer !== 'undefined' ? gameOverTimer : 1);
-            ctx.globalAlpha = alpha;
             const cx = LOGICAL_W / 2;
             const cy = LOGICAL_H / 2;
             const isRecord = Math.floor(score) >= highScore && highScore > 0;
@@ -852,7 +900,6 @@
                     ctx.restore();
                 }
             }
-            ctx.globalAlpha = 1;
         }
 
         ctx.restore(); // конец HUD

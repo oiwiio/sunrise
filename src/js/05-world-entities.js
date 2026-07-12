@@ -1,3 +1,4 @@
+// ── 05-world-entities.js ─────────────────────────────────────
 // Процедурный мир: горы (mountainSegments), термики, нисходящие потоки,
 // облака (спавн), частицы ветра/искры, камера по Y, сложность.
 // Зависит от: 01-core.js, 02-player-state.js, 04-audio.js (звуки при спавне).
@@ -112,12 +113,15 @@
         windParticles.push({
             x: LOGICAL_W + 10 + Math.random() * 80,
             y: Math.random() * LOGICAL_H,
-            length: 12 + Math.random() * 20,
+            length: 14 + Math.random() * 24,
             width: 0.8 + Math.random() * 1.2,
             life: 0.6 + Math.random() * 0.5,
             vx: -(2 + Math.random() * 6 + player.vx * 0.4),
             vy: (Math.random() - 0.5) * 0.6,
-            opacity: 0.15 + Math.random() * 0.25
+            opacity: 0.18 + Math.random() * 0.28,
+            curl: (Math.random() - 0.5) * 18,   // изгиб: + вверх, - вниз
+            phase: Math.random() * Math.PI * 2,  // фаза для волнистости
+            type: 'normal'
         });
     }
 
@@ -131,12 +135,15 @@
         windParticles.push({
             x: LOGICAL_W + 40 + Math.random() * 120,
             y: Math.random() * LOGICAL_H,
-            length: 35 + Math.random() * 50,
+            length: 40 + Math.random() * 60,
             width: 1.8 + Math.random() * 2.5,
             life: 0.9 + Math.random() * 0.6,
             vx: -(5 + Math.random() * 12 + player.vx * 0.9),
             vy: (Math.random() - 0.5) * 0.9,
-            opacity: 0.4 + Math.random() * 0.4
+            opacity: 0.4 + Math.random() * 0.4,
+            curl: (Math.random() - 0.5) * 32,   // сильнее изгиб на макс. скорости
+            phase: Math.random() * Math.PI * 2,
+            type: 'fast'
         });
     }
 
@@ -239,4 +246,3 @@
             windMilestoneIndex++;
         }
     }
-
