@@ -1,181 +1,177 @@
 // Экран приветствия, слайдеры настроек, флажок рекорда.
 // Зависит от: 01–05 (использует биомы/облака/горы для фона).
 
-    // привественный экран
+    // приветственный экран — поверх живой игры
     function drawWelcomeScreen() {
-        const s = UI_SCALE;
-        const cx = LOGICAL_W / 2;
+        const s   = UI_SCALE;
+        const sw  = Math.round(LOGICAL_W * 0.32); // ширина левой панели
 
-        // фон
-        let bg = ctx.createLinearGradient(0, 0, 0, LOGICAL_H);
-        bg.addColorStop(0,   '#1a0f2e');
-        bg.addColorStop(0.4, '#2B1F3D');
-        bg.addColorStop(1,   '#0a0c14');
-        ctx.fillStyle = bg;
+        // eased slide offset — панель уезжает влево
+        let slideX = 0;
+        if (menuSlideOut) {
+            let e = menuSlideT * menuSlideT * menuSlideT; // easeInCubic
+            slideX = -(sw + 40) * e;
+        }
+
+        // затемнение правой части (чтоб самолётик был виден)
+        ctx.fillStyle = 'rgba(5, 3, 15, 0.28)';
         ctx.fillRect(0, 0, LOGICAL_W, LOGICAL_H);
 
-        // горы (используем реальные сегменты) ──
-        ctx.fillStyle = '#3E2C49';
-        for (let seg of mountainSegments) {
-            let sx = (seg.x - frame * 0.4) % (segmentWidth * mountainSegments.length);
-            if (sx + segmentWidth < -100 || sx > LOGICAL_W + 100) continue;
-            ctx.beginPath();
-            ctx.moveTo(sx, LOGICAL_H);
-            ctx.lineTo(sx, seg.y - 20);
-            ctx.quadraticCurveTo(sx+segmentWidth*.18,seg.y-44,sx+segmentWidth*.3,seg.y-38);
-            ctx.quadraticCurveTo(sx+segmentWidth*.45,seg.y-18,sx+segmentWidth*.55,seg.y-28);
-            ctx.quadraticCurveTo(sx+segmentWidth*.72,seg.y-36,sx+segmentWidth*.8,seg.y-18);
-            ctx.quadraticCurveTo(sx+segmentWidth*.92,seg.y-10,sx+segmentWidth,seg.y-14);
-            ctx.lineTo(sx + segmentWidth, LOGICAL_H);
-            ctx.fill();
-        }
-        ctx.fillStyle = '#1D142B';
-        for (let seg of mountainSegments) {
-            let sx = (seg.x - frame * 0.9) % (segmentWidth * mountainSegments.length);
-            if (sx + segmentWidth < -100 || sx > LOGICAL_W + 100) continue;
-            ctx.beginPath();
-            ctx.moveTo(sx, LOGICAL_H);
-            ctx.lineTo(sx, seg.y);
-            ctx.quadraticCurveTo(sx+segmentWidth*.15,seg.y-20,sx+segmentWidth*.25,seg.y-14);
-            ctx.quadraticCurveTo(sx+segmentWidth*.38,seg.y-34,sx+segmentWidth*.45,seg.y-24);
-            ctx.quadraticCurveTo(sx+segmentWidth*.58,seg.y-10,sx+segmentWidth*.65,seg.y-18);
-            ctx.quadraticCurveTo(sx+segmentWidth*.82,seg.y-20,sx+segmentWidth,seg.y-6);
-            ctx.lineTo(sx + segmentWidth, LOGICAL_H);
-            ctx.fill();
-        }
-
-        // солнце (полноценное, как в игре) ──
-        let sunX = LOGICAL_W - 120, sunY = 110;
-        let pulse = 0.95 + Math.sin(frame * 0.03) * 0.05;
-        let atm = ctx.createRadialGradient(sunX, sunY, 20, sunX, sunY, 180);
-        atm.addColorStop(0, 'rgba(255,220,150,0.1)');
-        atm.addColorStop(1, 'rgba(255,120,50,0)');
-        ctx.fillStyle = atm;
-        ctx.beginPath(); ctx.arc(sunX, sunY, 180, 0, Math.PI*2); ctx.fill();
-
-        for (let [count, rSpeed, minR, len, spread, color] of [
-            [10,  0.008, 30, 95, 5,   'rgba(255,220,150,0.1)'],
-            [6,  -0.005, 22, 65, 3,   'rgba(255,245,200,0.12)'],
-            [14,  0.022, 28, 42, 1.5, 'rgba(255,255,220,0.18)'],
-        ]) {
-            ctx.save(); ctx.translate(sunX, sunY); ctx.rotate(frame * rSpeed);
-            for (let i = 0; i < count; i++) {
-                ctx.save(); ctx.rotate((i/count)*Math.PI*2);
-                let l = len + Math.sin(frame*0.05+i)*8;
-                ctx.beginPath(); ctx.moveTo(minR,0); ctx.lineTo(l,-spread); ctx.lineTo(l,spread);
-                ctx.fillStyle = color; ctx.fill(); ctx.restore();
-            }
-            ctx.restore();
-        }
-        let outer = ctx.createRadialGradient(sunX,sunY,10,sunX,sunY,85);
-        outer.addColorStop(0,'rgba(255,235,180,0.35)'); outer.addColorStop(1,'rgba(255,140,80,0)');
-        ctx.fillStyle = outer; ctx.beginPath(); ctx.arc(sunX,sunY,85*pulse,0,Math.PI*2); ctx.fill();
-        let core = ctx.createRadialGradient(sunX-5,sunY-5,0,sunX,sunY,38);
-        core.addColorStop(0,'#fffef0'); core.addColorStop(0.25,'#ffe6b0');
-        core.addColorStop(0.7,'#ffbc60'); core.addColorStop(1,'#ff9028');
-        ctx.fillStyle = core; ctx.beginPath(); ctx.arc(sunX,sunY,34*pulse,0,Math.PI*2); ctx.fill();
-        ctx.beginPath(); ctx.arc(sunX,sunY,7,0,Math.PI*2);
-        ctx.fillStyle='rgba(255,255,240,0.85)'; ctx.fill();
-
-        // частицы 
-        for (let i = 0; i < 16; i++) {
-            let px2 = (frame*0.15 + i*71) % (LOGICAL_W+100) - 50;
-            let py2 = 40 + Math.sin(frame*0.018 + i*0.7)*35;
-            ctx.fillStyle = `rgba(255,215,150,${0.12+Math.sin(frame*0.04+i)*0.07})`;
-            ctx.beginPath(); ctx.arc(px2, py2, 1.5+Math.sin(frame*0.06+i)*0.8, 0, Math.PI*2); ctx.fill();
-        }
-
-        // ЛЕВАЯ ЧАСТЬ
+        // левая тёмная панель
         ctx.save();
+        ctx.translate(slideX, 0);
+
+        // фон панели — градиент с прозрачностью на правом крае
+        let panelGrad = ctx.createLinearGradient(0, 0, sw, 0);
+        panelGrad.addColorStop(0,    'rgba(5, 3, 15, 0.94)');
+        panelGrad.addColorStop(0.75, 'rgba(8, 5, 20, 0.88)');
+        panelGrad.addColorStop(1,    'rgba(5, 3, 15, 0)');
+        ctx.fillStyle = panelGrad;
+        ctx.fillRect(0, 0, sw, LOGICAL_H);
+
+        // тонкая вертикальная линия — граница панели
+        ctx.beginPath();
+        ctx.moveTo(sw - 1, 0);
+        ctx.lineTo(sw - 1, LOGICAL_H);
+        ctx.strokeStyle = 'rgba(255,217,181,0.08)';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+
+        // контент панели
+        const tx = Math.round(40 * s);
+        const ty = Math.round(LOGICAL_H * 0.22);
         ctx.textAlign = 'left';
-        let tx = Math.round(60*s);
-        let ty = Math.round(LOGICAL_H/2 - 90*s);
 
         // название
-        ctx.font = `bold ${Math.round(64*s)}px "Segoe UI", monospace`;
-        ctx.fillStyle = 'rgba(255,249,232,0.06)';
-        ctx.fillText('SUNRISE', tx+2, ty+3);
-        ctx.shadowBlur = 16; ctx.shadowColor = 'rgba(255,180,80,0.3)';
+        ctx.font = `bold ${Math.round(52*s)}px "Segoe UI", monospace`;
+        ctx.fillStyle = 'rgba(255,249,232,0.07)';
+        ctx.fillText('SUNRISE', tx+2, ty+2);
+        ctx.shadowBlur = 14;
+        ctx.shadowColor = 'rgba(255,180,80,0.28)';
         ctx.fillStyle = '#FFF9E8';
         ctx.fillText('SUNRISE', tx, ty);
         ctx.shadowBlur = 0;
 
         // подзаголовок
-        ctx.font = `${Math.round(13*s)}px monospace`;
-        ctx.fillStyle = 'rgba(255,185,100,0.65)';
-        ctx.fillText('✦  ИГРА О ЛЁГКОСТИ  ✦', tx, ty + Math.round(32*s));
+        ctx.font = `${Math.round(12*s)}px monospace`;
+        ctx.fillStyle = 'rgba(255,185,100,0.6)';
+        ctx.fillText('✦  ИГРА О ЛЁГКОСТИ  ✦', tx, ty + Math.round(28*s));
 
         // разделитель
         ctx.beginPath();
-        ctx.moveTo(tx, ty + Math.round(46*s));
-        ctx.lineTo(tx + Math.round(230*s), ty + Math.round(46*s));
-        ctx.strokeStyle = 'rgba(255,217,181,0.12)'; ctx.lineWidth = 1; ctx.stroke();
+        ctx.moveTo(tx, ty + Math.round(42*s));
+        ctx.lineTo(tx + Math.round(180*s), ty + Math.round(42*s));
+        ctx.strokeStyle = 'rgba(255,217,181,0.1)';
+        ctx.lineWidth = 1; ctx.stroke();
 
         // управление
-        let gy = ty + Math.round(76*s);
-        ctx.font = `${Math.round(12*s)}px monospace`;
+        const gy = ty + Math.round(68*s);
+        ctx.font = `${Math.round(11*s)}px monospace`;
         [
             ['▼', 'ЗАЖМИ — ПИКИРУЙ'],
             ['▲', 'ОТПУСТИ — ПАРИ'],
             ['✦', 'ТЕРМИКИ ДАЮТ ЛЁГКОСТЬ'],
             ['☁', 'ОБЛАКА ЗАМЕДЛЯЮТ'],
         ].forEach(([icon, text], i) => {
-            let ly = gy + i * Math.round(26*s);
-            ctx.fillStyle = 'rgba(255,185,100,0.55)';
+            let ly = gy + i * Math.round(24*s);
+            ctx.fillStyle = 'rgba(255,185,100,0.5)';
             ctx.fillText(icon, tx, ly);
-            ctx.fillStyle = 'rgba(255,217,181,0.72)';
-            ctx.fillText(text, tx + Math.round(22*s), ly);
+            ctx.fillStyle = 'rgba(255,217,181,0.68)';
+            ctx.fillText(text, tx + Math.round(20*s), ly);
         });
 
         // ONE BUTTON бейдж
-        let by = gy + Math.round(118*s);
-        ctx.fillStyle = 'rgba(255,185,100,0.08)';
+        const by = gy + Math.round(110*s);
+        ctx.fillStyle = 'rgba(255,185,100,0.07)';
         ctx.beginPath();
-        ctx.roundRect(tx - Math.round(6*s), by - Math.round(14*s), Math.round(162*s), Math.round(22*s), Math.round(4*s));
+        ctx.roundRect(tx - Math.round(5*s), by - Math.round(13*s), Math.round(150*s), Math.round(20*s), Math.round(4*s));
         ctx.fill();
-        ctx.strokeStyle = 'rgba(255,185,100,0.25)'; ctx.lineWidth = 1; ctx.stroke();
-        ctx.font = `bold ${Math.round(10*s)}px monospace`;
-        ctx.fillStyle = 'rgba(255,200,120,0.75)';
+        ctx.strokeStyle = 'rgba(255,185,100,0.22)'; ctx.lineWidth = 1; ctx.stroke();
+        ctx.font = `bold ${Math.round(9*s)}px monospace`;
+        ctx.fillStyle = 'rgba(255,200,120,0.7)';
         ctx.fillText('⬡  ONE BUTTON GAME', tx, by);
 
         // рекорд
         if (highScore > 0) {
-            ctx.font = `${Math.round(11*s)}px monospace`;
-            ctx.fillStyle = 'rgba(201,178,139,0.55)';
-            ctx.fillText('РЕКОРД  ' + highScore + '  ✦', tx, by + Math.round(28*s));
+            ctx.font = `${Math.round(10*s)}px monospace`;
+            ctx.fillStyle = 'rgba(201,178,139,0.5)';
+            ctx.fillText('РЕКОРД  ' + highScore + '  ✦', tx, by + Math.round(26*s));
         }
 
-        ctx.restore();
-
-        // ── КНОПКА СТАРТА ──
-        let btnX = cx, btnY = LOGICAL_H - Math.round(68*s);
+        // кнопка — пульсирует внизу панели
+        const btnY = LOGICAL_H - Math.round(60*s);
         let bp = 0.85 + Math.sin(frame*0.06)*0.15;
-        let btnR = Math.round(28*s) * bp;
-
-        ctx.beginPath(); ctx.arc(btnX, btnY, btnR + Math.round(14*s), 0, Math.PI*2);
-        ctx.fillStyle = `rgba(255,185,100,${0.05*bp})`; ctx.fill();
-
-        ctx.beginPath(); ctx.arc(btnX, btnY, btnR, 0, Math.PI*2);
-        ctx.strokeStyle = `rgba(255,200,130,${0.45+Math.sin(frame*0.06)*0.2})`;
-        ctx.lineWidth = Math.round(1.5*s); ctx.stroke();
-
-        ctx.beginPath(); ctx.arc(btnX, btnY, btnR - Math.round(3*s), 0, Math.PI*2);
-        ctx.fillStyle = `rgba(255,185,80,${0.1*bp})`; ctx.fill();
-
-        ctx.save();
-        ctx.textAlign = 'center';
-        ctx.font = `bold ${Math.round(9*s)}px monospace`;
-        ctx.fillStyle = `rgba(255,230,180,${0.65+Math.sin(frame*0.06)*0.3})`;
-        ctx.fillText('НАЖМИ', btnX, btnY + Math.round(3*s));
         ctx.font = `${Math.round(10*s)}px monospace`;
-        ctx.fillStyle = 'rgba(255,217,181,0.28)';
-        ctx.fillText('ПРОБЕЛ  /  КЛИК  /  ТАП', btnX, btnY + Math.round(46*s));
+        ctx.fillStyle = `rgba(255,200,120,${0.45 + Math.sin(frame*0.06)*0.2})`;
+        ctx.fillText('▶  НАЖМИ ЧТОБЫ ЛЕТЕТЬ', tx, btnY);
+        ctx.font = `${Math.round(9*s)}px monospace`;
+        ctx.fillStyle = 'rgba(255,217,181,0.25)';
+        ctx.fillText('ПРОБЕЛ  /  КЛИК  /  ТАП', tx, btnY + Math.round(18*s));
+
+        ctx.restore(); // конец slide transform
+
+        // настройки — тоже уезжают с панелью
+        ctx.save();
+        ctx.translate(slideX, 0);
+        drawSettingsPanel();
         ctx.restore();
 
-        // настройки
-        drawSettingsPanel();
-    }
+        // самолётик на фоне (планирует, не зависит от slide) 
+        ctx.save();
+        ctx.translate(menuPlaneX, menuPlaneY);
+        // угол = небольшой наклон от скорости
+        let planeAngle = menuPlaneVY * 0.18;
+        ctx.rotate(planeAngle);
 
+        const drift = Math.sin(frame * 0.12) * 0.8;
+        ctx.rotate(drift * 0.025);
+        ctx.shadowBlur = 18;
+        ctx.shadowColor = 'rgba(255,200,100,0.2)';
+
+        // корпус
+        let bodyG = ctx.createLinearGradient(-14, 0, 20, 0);
+        bodyG.addColorStop(0,    '#F8F0E0');
+        bodyG.addColorStop(0.55, '#FFF8F0');
+        bodyG.addColorStop(1,    '#FFE8C8');
+        ctx.beginPath();
+        ctx.moveTo(20, 0); ctx.lineTo(-14, -7); ctx.lineTo(-8, 0); ctx.lineTo(-14, 7);
+        ctx.closePath(); ctx.fillStyle = bodyG; ctx.fill();
+
+        // нижняя тень
+        let shadG = ctx.createLinearGradient(-14, 0, 20, 0);
+        shadG.addColorStop(0, '#D4C4A8'); shadG.addColorStop(1, '#C8A878');
+        ctx.beginPath();
+        ctx.moveTo(20,0); ctx.lineTo(-8,0); ctx.lineTo(-14,7);
+        ctx.closePath(); ctx.fillStyle = shadG; ctx.fill();
+
+        // складка
+        ctx.beginPath(); ctx.moveTo(20,0); ctx.lineTo(-8,0);
+        ctx.lineWidth = 0.8; ctx.strokeStyle = 'rgba(180,155,120,0.7)'; ctx.lineCap = 'round'; ctx.stroke();
+
+        // верхнее крыло
+        let wTG = ctx.createLinearGradient(0,-18,0,0);
+        wTG.addColorStop(0,'rgba(255,252,245,0.95)'); wTG.addColorStop(1,'rgba(240,225,200,0.85)');
+        ctx.beginPath();
+        ctx.moveTo(8,0); ctx.lineTo(-2,-18+drift); ctx.lineTo(-10,-4); ctx.lineTo(-8,0);
+        ctx.closePath(); ctx.fillStyle = wTG; ctx.fill();
+        ctx.strokeStyle = 'rgba(180,155,120,0.4)'; ctx.lineWidth = 0.6; ctx.stroke();
+
+        // нижнее крыло
+        let wBG = ctx.createLinearGradient(0,0,0,14);
+        wBG.addColorStop(0,'rgba(230,210,185,0.9)'); wBG.addColorStop(1,'rgba(200,175,140,0.7)');
+        ctx.beginPath();
+        ctx.moveTo(8,0); ctx.lineTo(-2,14-drift); ctx.lineTo(-10,4); ctx.lineTo(-8,0);
+        ctx.closePath(); ctx.fillStyle = wBG; ctx.fill();
+        ctx.strokeStyle = 'rgba(160,135,100,0.35)'; ctx.lineWidth = 0.6; ctx.stroke();
+
+        // блик
+        ctx.beginPath();
+        ctx.moveTo(20,0); ctx.lineTo(6,-5); ctx.lineTo(2,-2);
+        ctx.closePath(); ctx.fillStyle = 'rgba(255,255,255,0.35)'; ctx.fill();
+
+        ctx.shadowBlur = 0;
+        ctx.restore();
+    }
     function drawSlider(x, y, w, t, s) {
         s = s || 1;
         const h = Math.round(6*s);
@@ -291,4 +287,3 @@
             ctx.fill();
         }
     }
-    

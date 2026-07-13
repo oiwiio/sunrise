@@ -15,11 +15,8 @@
         ctx.globalCompositeOperation = 'source-over';
         frame++;
 
-        // если показываем приветственный экран — рисуем его и выходим
-        if (showWelcome) {
-            drawWelcomeScreen();
-            return;
-        }
+        // во время меню — рисуем игровой мир как фон, потом накладываем UI
+        // (early return убран — меню теперь оверлей поверх живого мира)
         
         const camY = getCameraY();
         
@@ -72,7 +69,7 @@
         : Math.min(1, biomT());           // переходим ИЗ ночи — обратно день
     const isNight = getCurBiom().id === 'night' || (getNextBiom && getNextBiom().id === 'night' && biomT() > 0.5);
 
-    // ── СОЛНЦЕ (дневная сторона) ──
+    // СОЛНЦЕ (дневная сторона)
     if (nightT < 1) {
         const sunAlpha = 1 - nightT;
         ctx.save();
@@ -145,7 +142,7 @@
         ctx.restore();
     }
 
-    // ── ЛУНА (ночная сторона) ──
+    // ЛУНА (ночная сторона) 
     if (nightT > 0) {
         const moonAlpha = nightT;
         const moonR = 28 * pulse;
@@ -950,6 +947,11 @@
             vignette.addColorStop(1, `rgba(110, 10, 10, ${vignetteStrength.toFixed(3)})`);
             ctx.fillStyle = vignette;
             ctx.fillRect(0, 0, LOGICAL_W, LOGICAL_H);
+        }
+
+        // приветственный экран — поверх всего
+        if (showWelcome) {
+            drawWelcomeScreen();
         }
 
         // конец кадра — сбрасываем трансформ для безопасности

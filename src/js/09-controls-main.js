@@ -74,7 +74,17 @@
     }
 
     let activeSlider = null;
-    let isPortrait = false;
+    let isPortrait   = false;
+
+    // анимация перехода меню → игра
+    let menuSlideOut = false;
+    let menuSlideT   = 0;
+    const MENU_SLIDE_DUR = 0.45;
+
+    // самолётик на меню
+    let menuPlaneY  = 0;
+    let menuPlaneX  = 0;
+    let menuPlaneVY = -0.4;
 
     function handleOrientationChange() {
         const portrait = window.innerHeight > window.innerWidth;
@@ -145,6 +155,13 @@
         e.preventDefault();
     }
 
+    // переопределяем — запускаем анимацию ухода меню вместо мгновенного старта
+    function startGameFromWelcome() {
+        if (menuSlideOut) return;
+        menuSlideOut = true;
+        menuSlideT   = 0;
+    }
+
     function bindControls() {
         window.addEventListener('keydown', (e) => {
             if (e.code === 'Space') { e.preventDefault(); handlePressStart(e); }
@@ -164,6 +181,8 @@
     // запуск
     resizeCanvas();
     resetPlayerPos();
+    menuPlaneX = LOGICAL_W * 0.68;
+    menuPlaneY = LOGICAL_H * 0.42;
     window.addEventListener('resize', () => {
         resizeCanvas();
         handleOrientationChange();
@@ -177,7 +196,28 @@
         if (timestamp - lastUpdate >= FRAME_TIME) {
             let delta = Math.min(0.05, (timestamp - lastUpdate) / 1000);
             lastUpdate = timestamp;
-            if (!showWelcome) updateGame(delta);
+
+            if (showWelcome) {
+                // самолётик планирует
+                menuPlaneVY += 0.005;
+                menuPlaneVY = Math.max(-0.55, Math.min(0.55, menuPlaneVY));
+                menuPlaneY += menuPlaneVY;
+                menuPlaneY += (LOGICAL_H * 0.42 - menuPlaneY) * 0.003;
+
+                // слайд-анимация ухода меню
+                if (menuSlideOut) {
+                    menuSlideT = Math.min(1, menuSlideT + delta / MENU_SLIDE_DUR);
+                    if (menuSlideT >= 1) {
+                        showWelcome  = false;
+                        menuSlideOut = false;
+                        menuSlideT   = 0;
+                        gameRunning  = true;
+                        restartGame();
+                    }
+                }
+            } else {
+                updateGame(delta);
+            }
         }
         draw();
     }
