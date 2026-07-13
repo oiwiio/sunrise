@@ -628,7 +628,7 @@
             ctx.stroke();
         }
 
-    // игрок
+    // игрок — бумажный самолётик
     ctx.save();
     ctx.globalAlpha = 1;
     ctx.filter = 'none';
@@ -636,106 +636,100 @@
     ctx.translate(player.x - cameraX, player.y - camY);
     ctx.rotate(player.angle);
 
-    let flap = Math.sin(frame * 0.18) * 0.8;
-    let scarfSwing = Math.max(-14, Math.min(14, -player.vy * 2.2));
+    // лёгкое покачивание на воздушных потоках
+    const drift = Math.sin(frame * 0.12) * 0.8;
+    ctx.rotate(drift * 0.03);
 
-    ctx.shadowBlur = 12;
-    ctx.shadowColor = 'rgba(0,0,0,0.18)';
+    ctx.shadowBlur = 14;
+    ctx.shadowColor = 'rgba(0,0,0,0.22)';
 
-    // крыло
-    let wingGrad = ctx.createLinearGradient(-12, -10, 18, 6);
-    wingGrad.addColorStop(0, '#FFF7EA');
-    wingGrad.addColorStop(0.45, '#FFE1B6');
-    wingGrad.addColorStop(1, '#FFC97A');
-
+    // корпус самолётика (верхняя плоскость)
+    // вытянутый треугольник вправо — нос самолёта
+    let bodyGrad = ctx.createLinearGradient(-14, 0, 20, 0);
+    bodyGrad.addColorStop(0,    '#F8F0E0');
+    bodyGrad.addColorStop(0.55, '#FFF8F0');
+    bodyGrad.addColorStop(1,    '#FFE8C8');
     ctx.beginPath();
-    ctx.moveTo(18, -4);
-    ctx.quadraticCurveTo(8, -16 - flap, -6, -11);
-    ctx.quadraticCurveTo(-13, -2, -10, 5);
-    ctx.quadraticCurveTo(2, 2 + flap * 0.3, 18, -4);
-    ctx.fillStyle = wingGrad;
-    ctx.fill();
-
-    // нижняя тень крыла 
-    ctx.beginPath();
-    ctx.moveTo(12, -3);
-    ctx.quadraticCurveTo(2, 1, -6, 3);
-    ctx.quadraticCurveTo(2, 4, 12, -3);
-    ctx.fillStyle = 'rgba(140, 90, 40, 0.14)';
-    ctx.fill();
-
-    // стропы
-    ctx.beginPath();
-    ctx.moveTo(-2, -8); ctx.lineTo(-6, 4);
-    ctx.moveTo(4, -9);  ctx.lineTo(-1, 5);
-    ctx.moveTo(10, -6); ctx.lineTo(4, 5);
-    ctx.lineWidth = 1.1;
-    ctx.strokeStyle = '#B78D62';
-    ctx.stroke();
-
-    // тело
-    let bodyGrad = ctx.createLinearGradient(-5, 0, 4, 10);
-    bodyGrad.addColorStop(0, '#F3C98E');
-    bodyGrad.addColorStop(1, '#C9975E');
-
-    ctx.beginPath();
-    ctx.ellipse(-1, 5, 4, 5.5, 0.12, 0, Math.PI * 2);
+    ctx.moveTo(20, 0);           // нос
+    ctx.lineTo(-14, -7);         // верхний хвост
+    ctx.lineTo(-8, 0);           // центр хвоста
+    ctx.lineTo(-14, 7);          // нижний хвост
+    ctx.closePath();
     ctx.fillStyle = bodyGrad;
     ctx.fill();
-        
-    // голова
-    let headGrad = ctx.createRadialGradient(-4, 0, 1, -2, 2, 5);
-    headGrad.addColorStop(0, '#FFE2B7');
-    headGrad.addColorStop(1, '#D9A66C');
 
+    // нижняя грань (тёмнее — тень снизу) 
+    let shadowGrad = ctx.createLinearGradient(-14, 0, 20, 0);
+    shadowGrad.addColorStop(0,   '#D4C4A8');
+    shadowGrad.addColorStop(0.6, '#E8D8C0');
+    shadowGrad.addColorStop(1,   '#C8A878');
     ctx.beginPath();
-    ctx.arc(-2.8, 1.8, 3.4, 0, Math.PI * 2);
-    ctx.fillStyle = headGrad;
+    ctx.moveTo(20, 0);
+    ctx.lineTo(-8, 0);
+    ctx.lineTo(-14, 7);
+    ctx.closePath();
+    ctx.fillStyle = shadowGrad;
     ctx.fill();
 
-    // шарф
+    // центральная складка — линия по хребту 
     ctx.beginPath();
-    ctx.moveTo(1, 4);
-    ctx.quadraticCurveTo(-10, 5 + scarfSwing * 0.2, -18, 8 + scarfSwing);
-    ctx.quadraticCurveTo(-12, 7 + scarfSwing * 0.45, -2, 6);
-    ctx.lineWidth = 1;
-    ctx.strokeStyle = '#FFF1D6';
-    ctx.stroke();
-
-    // глаз
-    ctx.beginPath();
-    ctx.arc(-4.4, 1.2, 1, 0, Math.PI * 2);
-    ctx.fillStyle = '#FFFFFF';
-    ctx.fill();
-
-    ctx.beginPath();
-    ctx.arc(-4.7, 1.1, 0.45, 0, Math.PI * 2);
-    ctx.fillStyle = '#2C2C2C';
-        ctx.fill();
-
-    // улыбка
-    ctx.beginPath();
-    ctx.arc(-3.2, 2.4, 1.2, 0.2, Math.PI - 0.2);
+    ctx.moveTo(20, 0);
+    ctx.lineTo(-8, 0);
     ctx.lineWidth = 0.8;
-    ctx.strokeStyle = '#8B5A2B';
+    ctx.strokeStyle = 'rgba(180,155,120,0.7)';
+    ctx.lineCap = 'round';
     ctx.stroke();
 
-    // ноги
+    // крылья — боковые плоскости 
+    // верхнее крыло
+    let wingTopGrad = ctx.createLinearGradient(0, -18, 0, 0);
+    wingTopGrad.addColorStop(0,   'rgba(255,252,245,0.95)');
+    wingTopGrad.addColorStop(1,   'rgba(240,225,200,0.85)');
     ctx.beginPath();
-    ctx.moveTo(-3, 9);  
-    ctx.lineTo(-7, 13 + flap * 0.2);
-    ctx.moveTo(1, 9);
-    ctx.lineTo(4, 12);
-    ctx.lineWidth = 1.4;
-    ctx.strokeStyle = '#C79C6B';
+    ctx.moveTo(8, 0);            // точка на корпусе
+    ctx.lineTo(-2, -18 + drift); // кончик крыла (покачивается)
+    ctx.lineTo(-10, -4);         // хвостовой корень крыла
+    ctx.lineTo(-8, 0);
+    ctx.closePath();
+    ctx.fillStyle = wingTopGrad;
+    ctx.fill();
+    // обводка крыла
+    ctx.strokeStyle = 'rgba(180,155,120,0.4)';
+    ctx.lineWidth = 0.6;
     ctx.stroke();
 
-    // свет сверху
+    // нижнее крыло (зеркально, чуть меньше)
+    let wingBotGrad = ctx.createLinearGradient(0, 0, 0, 14);
+    wingBotGrad.addColorStop(0,   'rgba(230,210,185,0.9)');
+    wingBotGrad.addColorStop(1,   'rgba(200,175,140,0.7)');
     ctx.beginPath();
-    ctx.moveTo(12, -5);
-    ctx.quadraticCurveTo(2, -12, -5, -8);
-    ctx.strokeStyle = 'rgba(255,255,255,0.22)';
-    ctx.lineWidth = 1.3;
+    ctx.moveTo(8, 0);
+    ctx.lineTo(-2, 14 - drift);  // кончик нижнего крыла
+    ctx.lineTo(-10, 4);
+    ctx.lineTo(-8, 0);
+    ctx.closePath();
+    ctx.fillStyle = wingBotGrad;
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(160,135,100,0.35)';
+    ctx.lineWidth = 0.6;
+    ctx.stroke();
+
+    // блик на носу — свет спереди
+    ctx.beginPath();
+    ctx.moveTo(20, 0);
+    ctx.lineTo(6, -5);
+    ctx.lineTo(2, -2);
+    ctx.closePath();
+    ctx.fillStyle = 'rgba(255,255,255,0.35)';
+    ctx.fill();
+
+    // след за хвостом — маленький вихрь 
+    ctx.beginPath();
+    ctx.moveTo(-14, -2);
+    ctx.quadraticCurveTo(-22, 0 + drift * 0.5, -28, -3 + drift);
+    ctx.lineWidth = 0.9;
+    ctx.strokeStyle = 'rgba(255,245,230,0.25)';
+    ctx.lineCap = 'round';
     ctx.stroke();
 
     ctx.shadowBlur = 0;
