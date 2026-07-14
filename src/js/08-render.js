@@ -489,11 +489,93 @@
         for (let t of thermals) {
             let screenX = t.x - cameraX;
             let screenY = t.y - camY;
+            const pulseScale = 0.85 + Math.sin(frame * 0.025 + t.pulse) * 0.1;
+
+            ctx.save();
+
+            // поймали: короткая вспышка вместо обычного термика 
+            if (t.caught) {
+                const ft = t.catchTimer / 0.3; // 0..1
+                const flashR = t.pullRadius * (0.4 + ft * 0.8);
+                let flashGrad = ctx.createRadialGradient(screenX, screenY, 0, screenX, screenY, flashR);
+                flashGrad.addColorStop(0, biomColorA('thermalColor', Math.max(0, 1 - ft) * 0.9));
+                flashGrad.addColorStop(1, biomColorA('thermalColor', 0));
+                ctx.fillStyle = flashGrad;
+                ctx.beginPath();
+                ctx.arc(screenX, screenY, flashR, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+                continue;
+            }
+
+            // шлейф тёплого воздуха, "исходящий от земли" к термику ──
+            let shaftGrad = ctx.createLinearGradient(screenX, screenY + t.pullRadius * 1.6, screenX, screenY - t.coreRadius);
+            shaftGrad.addColorStop(0, biomColorA('thermalColor', 0));
+            shaftGrad.addColorStop(1, biomColorA('thermalColor', 0.16));
+            ctx.fillStyle = shaftGrad;
             ctx.beginPath();
-            let pulseScale = 0.85 + Math.sin(frame * 0.025 + t.pulse) * 0.1;
-            ctx.arc(screenX, screenY, t.radius * pulseScale, 0, Math.PI * 2);
-            ctx.fillStyle = biomColorA('thermalColor', 0.24+Math.sin(Date.now()*0.005)*0.08);
+            ctx.moveTo(screenX - t.coreRadius * 0.5, screenY + t.pullRadius * 1.6);
+            ctx.lineTo(screenX + t.coreRadius * 0.5, screenY + t.pullRadius * 1.6);
+            ctx.lineTo(screenX + t.coreRadius * 1.1, screenY);
+            ctx.lineTo(screenX - t.coreRadius * 1.1, screenY);
+            ctx.closePath();
             ctx.fill();
+
+            // тонкое кольцо — видимая зона притяжения 
+            ctx.beginPath();
+            ctx.arc(screenX, screenY, t.pullRadius, 0, Math.PI * 2);
+            ctx.strokeStyle = biomColorA('thermalColor', 0.14 + Math.sin(frame * 0.03 + t.pulse) * 0.05);
+            ctx.lineWidth = 1.2;
+            ctx.setLineDash([4, 6]);
+            ctx.stroke();
+            ctx.setLineDash([]);
+
+            // концентрические волны, расширяющиеся от центра наружу
+            for (let r = 0; r < 3; r++) {
+                const ringPhase  = ((frame * 0.006) + t.pulse * 0.1 + r / 3) % 1;
+                const ringRadius = t.coreRadius + ringPhase * (t.pullRadius - t.coreRadius);
+                const ringAlpha  = (1 - ringPhase) * 0.35;
+                ctx.beginPath();
+                ctx.arc(screenX, screenY, ringRadius, 0, Math.PI * 2);
+                ctx.strokeStyle = biomColorA('thermalColor', ringAlpha);
+                ctx.lineWidth = 2;
+                ctx.stroke();
+            }
+
+            // яркое свечение к центру 
+            const glowR = t.coreRadius * pulseScale * 1.4;
+            let glowGrad = ctx.createRadialGradient(screenX, screenY, 0, screenX, screenY, glowR);
+            glowGrad.addColorStop(0, biomColorA('thermalColor', 0.55 + Math.sin(Date.now() * 0.005) * 0.08));
+            glowGrad.addColorStop(1, biomColorA('thermalColor', 0));
+            ctx.fillStyle = glowGrad;
+            ctx.beginPath();
+            ctx.arc(screenX, screenY, glowR, 0, Math.PI * 2);
+            ctx.fill();
+
+            // частицы, летящие вверх внутри термика 
+            for (let p of t.particles) {
+                const px = screenX + p.offsetX * t.coreRadius * 0.8;
+                const py = screenY + t.pullRadius * 0.9 - p.phase * (t.pullRadius * 0.9 + t.coreRadius);
+                const pAlpha = Math.sin(p.phase * Math.PI); // мягко появляется и исчезает
+                ctx.beginPath();
+                ctx.arc(px, py, p.size, 0, Math.PI * 2);
+                ctx.fillStyle = biomColorA('thermalColor', pAlpha * 0.7);
+                ctx.fill();
+            }
+
+            // подсказка: дуга-стрелка сверху намекает, что термик тянет вверх 
+            const hintY = screenY - t.pullRadius - 14 + Math.sin(frame * 0.04 + t.pulse) * 3;
+            ctx.beginPath();
+            ctx.moveTo(screenX - 8, hintY + 6);
+            ctx.lineTo(screenX, hintY - 6);
+            ctx.lineTo(screenX + 8, hintY + 6);
+            ctx.strokeStyle = biomColorA('thermalColor', 0.5);
+            ctx.lineWidth = 2;
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+            ctx.stroke();
+
+            ctx.restore();
         }
         
         // турбулентность (только рендер)

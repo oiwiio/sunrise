@@ -107,20 +107,46 @@
             return;
         }
         
-        // термики
+        // термики — нарастающая тяга по мере приближения к центру + поимка в ядре
         for (let i = 0; i < thermals.length; i++) {
             let t = thermals[i];
+
+            // анимация частиц внутри термика (летят вверх, зацикливаются)
+            for (let p of t.particles) {
+                p.phase += p.speed * dt * 0.02;
+                if (p.phase > 1) p.phase -= 1;
+            }
+
+            if (t.caught) {
+                // короткая вспышка после поимки, потом термик убирается
+                t.catchTimer += delta;
+                if (t.catchTimer > 0.3) { thermals.splice(i, 1); i--; }
+                continue;
+            }
+
             let dx = player.x - t.x;
             let dy = player.y - t.y;
-            if (Math.hypot(dx, dy) < t.radius + 9) {
-                player.vy -= t.strength * 1.2 * dt;
+            let dist = Math.hypot(dx, dy);
+
+            if (dist < t.pullRadius) {
+                // чем ближе к центру — тем сильнее тянет вверх
+                const proximity = 1 - Math.max(0, dist - t.coreRadius) / (t.pullRadius - t.coreRadius);
+                const pull = t.strength * (0.12 + proximity * proximity * 0.9);
+                player.vy -= pull * dt;
+            }
+
+            if (dist < t.coreRadius) {
+                // поимка: вспышка + очки + лёгкое ускорение персонажа
+                t.caught     = true;
+                t.catchTimer = 0;
+                player.vy   -= t.strength * 0.9;
+                player.vx   += 0.35; // короткий импульс вперёд при захвате
                 score += 12;
                 addLightnessSpark(t.x, t.y);
                 playThermalSound();
-                thermals.splice(i, 1);
-                i--;
                 continue;
             }
+
             if (t.x < cameraX - 200) {
                 thermals.splice(i, 1);
                 i--;

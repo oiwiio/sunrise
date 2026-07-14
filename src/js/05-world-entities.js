@@ -1,4 +1,3 @@
-// ── 05-world-entities.js ─────────────────────────────────────
 // Процедурный мир: горы (mountainSegments), термики, нисходящие потоки,
 // облака (спавн), частицы ветра/искры, камера по Y, сложность.
 // Зависит от: 01-core.js, 02-player-state.js, 04-audio.js (звуки при спавне).
@@ -45,12 +44,31 @@
     function addThermalIfNeeded() {
         if (thermals.length >= THERMAL_MAX) return;
         if (Math.random() * 300 < THERMAL_GEN_RATE) {
+            const coreRadius = 14 + Math.random() * 6;   // радиус "поимки" (в центре)
+            const pullRadius = coreRadius + 55 + Math.random() * 35; // радиус зоны притяжения
+
+            // маленькие частицы, летящие вверх внутри термика (декоративные)
+            const particles = [];
+            const particleCount = 7 + Math.floor(Math.random() * 5);
+            for (let i = 0; i < particleCount; i++) {
+                particles.push({
+                    offsetX: (Math.random() - 0.5) * 2, // доля от радиуса, -1..1
+                    phase:   Math.random(),              // 0..1 — текущая высота внутри столба
+                    speed:   0.35 + Math.random() * 0.35,
+                    size:    1 + Math.random() * 1.6
+                });
+            }
+
             thermals.push({
                 x: cameraX + LOGICAL_W + 40 + Math.random() * 180,
                 y: 70 + Math.random() * (LOGICAL_H - 150),
-                radius: 32 + Math.random() * 18,
+                coreRadius: coreRadius,
+                pullRadius: pullRadius,
                 pulse: Math.random() * Math.PI * 2,
-                strength: 0.28 + Math.random() * 0.18
+                strength: 0.28 + Math.random() * 0.18,
+                particles: particles,
+                caught: false,     // true — уже поймали, доигрывает вспышку
+                catchTimer: 0
             });
         }
     }
