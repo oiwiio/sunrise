@@ -339,26 +339,10 @@
         ctx.fill();
     }
 
-    // СЛОЙ 3: атмосферная дымка между планами
-    {
-        // верхняя дымка (у линии горизонта дальних гор)
-        let hazeY1 = LOGICAL_H * 0.42;
-        let h1 = ctx.createLinearGradient(0, hazeY1 - 40, 0, hazeY1 + 80);
-        h1.addColorStop(0,   'rgba(0,0,0,0)');
-        h1.addColorStop(0.45, toRgba(biomColor('fogColor'), 0.18));
-        h1.addColorStop(1,   'rgba(0,0,0,0)');
-        ctx.fillStyle = h1;
-        ctx.fillRect(0, hazeY1 - 40, LOGICAL_W, 120);
-
-        // нижняя дымка (у подножья гор)
-        let hazeY2 = LOGICAL_H * 0.68;
-        let h2 = ctx.createLinearGradient(0, hazeY2 - 20, 0, hazeY2 + 70);
-        h2.addColorStop(0,   'rgba(0,0,0,0)');
-        h2.addColorStop(0.4, toRgba(biomColor('fogColor'), 0.28));
-        h2.addColorStop(1,   'rgba(0,0,0,0)');
-        ctx.fillStyle = h2;
-        ctx.fillRect(0, hazeY2 - 20, LOGICAL_W, 90);
-    }
+    // дымка — плоские полосы без градиентов
+    ctx.fillStyle = toRgba(biomColor('fogColor'), 0.14);
+    ctx.fillRect(0, LOGICAL_H * 0.38, LOGICAL_W, LOGICAL_H * 0.08);
+    ctx.fillRect(0, LOGICAL_H * 0.62, LOGICAL_W, LOGICAL_H * 0.07);
 
     // горы: одна вершина на сегмент, сплайн без волн ──
     function buildMtnPoints(offsetY) {
@@ -461,75 +445,48 @@
     nearGrad.addColorStop(1,    biomColor('nearMtn'));
     drawMtnLayer(nearPts, nearGrad, biomColor('snowCap'));
 
-        // облака
-        // рисуем от дальних к ближним (параллакс) — дальние облака мельче, тусклее и мягче
+        // облака — без blur и без градиентов (быстро)
+        const _cTop = biomColor('cloudTop');
+        const _cBot = biomColor('cloudBot');
         const cloudsToDraw = [...clouds].sort((a, b) => a.depth - b.depth);
         for (let c of cloudsToDraw) {
             let x = c.x - cameraX;
             let y = c.y - camY;
             let w = c.width;
             let h = c.height;
-            
             if (!isFinite(x) || !isFinite(y) || !w || !h) continue;
+            if (x + w < -20 || x - w > LOGICAL_W + 20) continue;
 
             ctx.save();
             ctx.globalAlpha = c.opacity;
-            // дальние облака чуть размыты — усиливает ощущение глубины
-            ctx.filter = `blur(${Math.max(0, (1 - c.depth) * 1.6).toFixed(2)}px)`;
 
-            // лёгкая дымка вокруг облака
-            let glow = ctx.createRadialGradient(x, y, h * 0.2, x, y, w * 0.9);
-
-                
-
-            glow.addColorStop(0, 'rgba(255, 240, 220, 0.08)');
-            glow.addColorStop(1, 'rgba(255, 240, 220, 0)');
-            ctx.fillStyle = glow;
+            // тень снизу
+            ctx.fillStyle = 'rgba(160, 170, 200, 0.14)';
             ctx.beginPath();
-            ctx.ellipse(x, y, w, h * 0.9, 0, 0, Math.PI * 2);
+            ctx.arc(x, y + h * 0.25, h * 0.5, 0, Math.PI * 2);
             ctx.fill();
-            
-            // силуэт нижних "пухов" (тень)
-            ctx.fillStyle = 'rgba(180, 190, 210, 0.16)';
+
+            // тело — верхний цвет
+            ctx.fillStyle = _cTop;
             ctx.beginPath();
-            ctx.arc(x - w * 0.38, y + 8, h * 0.42, 0, Math.PI * 2);
-            ctx.arc(x + w * 0.3, y + 10, h * 0.4, 0, Math.PI * 2);
-            ctx.arc(x, y + 4, h * 0.52, 0, Math.PI * 2);
-            ctx.fill();
-            
-            // основное тело облака (градиент)
-            let body = ctx.createLinearGradient(x, y - h, x, y + h);
-            body.addColorStop(0, biomColor('cloudTop'));
-            body.addColorStop(1, biomColor('cloudBot'));
-            ctx.fillStyle = body;
-            ctx.beginPath();
-            ctx.arc(x - w * 0.42, y, h * 0.46, 0, Math.PI * 2);
-            ctx.arc(x - w * 0.1, y - h * 0.18, h * 0.56, 0, Math.PI * 2); 
-            ctx.arc(x + w * 0.22, y - h * 0.08, h * 0.5, 0, Math.PI * 2);
+            ctx.arc(x - w * 0.42, y,           h * 0.46, 0, Math.PI * 2);
+            ctx.arc(x - w * 0.1,  y - h * 0.18, h * 0.56, 0, Math.PI * 2);
+            ctx.arc(x + w * 0.22, y - h * 0.08, h * 0.5,  0, Math.PI * 2);
             ctx.arc(x + w * 0.45, y + h * 0.04, h * 0.38, 0, Math.PI * 2);
             ctx.fill();
-            
-            // рассветная подсветка сверху
-            let highlight = ctx.createLinearGradient(x, y - h, x, y);
-            highlight.addColorStop(0, biomColorA('cloudHL', parseColor(biomColor('cloudHL'))[3]));
-            highlight.addColorStop(1, biomColorA('cloudHL', 0));
-            ctx.fillStyle = highlight;
+
+            // нижняя часть темнее
+            ctx.fillStyle = _cBot;
+            ctx.globalAlpha = c.opacity * 0.3;
             ctx.beginPath();
-            ctx.arc(x - w * 0.15, y - h * 0.2, h * 0.28, 0, Math.PI * 2);
-            ctx.arc(x + w * 0.15, y - h * 0.16, h * 0.24, 0, Math.PI * 2);
+            ctx.arc(x - w * 0.42, y + h * 0.08, h * 0.38, 0, Math.PI * 2);
+            ctx.arc(x + w * 0.22, y + h * 0.04, h * 0.35, 0, Math.PI * 2);
             ctx.fill();
-            
-            // лёгкая обводка (воздушность)
-            ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
-            ctx.lineWidth = 1.5;
-            ctx.beginPath();
-            ctx.arc(x - w * 0.42, y, h * 0.46, 0, Math.PI * 2);
-            ctx.arc(x - w * 0.1, y - h * 0.18, h * 0.56, 0, Math.PI * 2);
-            ctx.arc(x + w * 0.22, y - h * 0.08, h * 0.5, 0, Math.PI * 2);
-            ctx.stroke();
+
+            ctx.globalAlpha = 1;
             ctx.restore();
         }
-        ctx.filter = 'none';  // гарантированный сброс filter после облаков
+        ctx.filter = 'none';
 
         //термики
         for (let t of thermals) {
@@ -595,33 +552,20 @@
         // частицы биома (птицы, угли, звёзды, молнии)
         drawBiomParticles(camY);
 
-        // линии ветра — изогнутые, с завитком и затуханием
+        // линии ветра — изогнутые, без градиента
+        ctx.lineCap = 'round';
         for (let p of windParticles) {
             const curl  = p.curl  || 0;
             const phase = p.phase || 0;
-            const len   = p.length;
-            const alpha = p.life * p.opacity * 0.65;
-
-            // контрольная точка Безье — создаёт изгиб
-            // завиток: середина линии смещена вверх/вниз на curl + лёгкая волна
-            const wave  = Math.sin(frame * 0.08 + phase) * (p.type === 'fast' ? 5 : 2);
-            const cpX   = p.x - len * 0.5;
-            const cpY   = p.y + curl * 0.5 + wave;
-            const endX  = p.x - len;
-            const endY  = p.y - p.vy * 2 + curl;
-
-            // рисуем через градиент: хвост прозрачный, голова яркая
-            const grad = ctx.createLinearGradient(p.x, p.y, endX, endY);
-            const col  = biomColorA('windColor', alpha);
-            grad.addColorStop(0, col);
-            grad.addColorStop(1, 'rgba(255,255,255,0)');
-
+            const wave  = Math.sin(frame * 0.08 + phase) * (p.type === 'fast' ? 4 : 2);
             ctx.beginPath();
             ctx.moveTo(p.x, p.y);
-            ctx.quadraticCurveTo(cpX, cpY, endX, endY);
-            ctx.lineWidth  = p.width * (0.8 + p.life * 0.4);
-            ctx.strokeStyle = grad;
-            ctx.lineCap = 'round';
+            ctx.quadraticCurveTo(
+                p.x - p.length * 0.5, p.y + curl * 0.5 + wave,
+                p.x - p.length,       p.y - p.vy * 2 + curl
+            );
+            ctx.lineWidth   = p.width * (0.8 + p.life * 0.4);
+            ctx.strokeStyle = biomColorA('windColor', p.life * p.opacity * 0.55);
             ctx.stroke();
         }
 
@@ -637,8 +581,7 @@
     const drift = Math.sin(frame * 0.12) * 0.8;
     ctx.rotate(drift * 0.03);
 
-    ctx.shadowBlur = 14;
-    ctx.shadowColor = 'rgba(0,0,0,0.22)';
+    // shadowBlur убран — дорого на мобильных
 
     // корпус самолётика (верхняя плоскость)
     // вытянутый треугольник вправо — нос самолёта
