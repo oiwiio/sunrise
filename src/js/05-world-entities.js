@@ -44,7 +44,7 @@
     function addThermalIfNeeded() {
         if (thermals.length >= THERMAL_MAX) return;
         if (Math.random() * 300 < THERMAL_GEN_RATE) {
-            const coreRadius = 14 + Math.random() * 6;   // радиус "поимки" (в центре)
+            const coreRadius = 20 + Math.random() * 8;   // радиус "поимки" (в центре) — увеличен для удобства
             const pullRadius = coreRadius + 55 + Math.random() * 35; // радиус зоны притяжения
 
             // маленькие частицы, летящие вверх внутри термика (декоративные)
@@ -76,11 +76,30 @@
     function addDowndraftIfNeeded() {
         if (downdrafts.length >= DOWNDRAFT_MAX) return;
         if (Math.random() * 350 < DOWNDRAFT_GEN_RATE) {
+            const coreRadius = 16 + Math.random() * 6;    // радиус "удара"
+            const pullRadius = coreRadius + 45 + Math.random() * 30; // радиус зоны турбулентности
+
+            // частицы, хаотично кружащиеся внутри вихря (не летят вверх, как у термика)
+            const particles = [];
+            const particleCount = 6 + Math.floor(Math.random() * 4);
+            for (let i = 0; i < particleCount; i++) {
+                particles.push({
+                    angle: Math.random() * Math.PI * 2,
+                    spin:  (Math.random() < 0.5 ? -1 : 1) * (0.6 + Math.random() * 0.6),
+                    size:  1 + Math.random() * 1.6
+                });
+            }
+
             downdrafts.push({
                 x: cameraX + LOGICAL_W + 30 + Math.random() * 200,
                 y: 50 + Math.random() * (LOGICAL_H - 100),
-                radius: 35 + Math.random() * 20,
-                strength: -0.22 - Math.random() * 0.15
+                coreRadius: coreRadius,
+                pullRadius: pullRadius,
+                pulse: Math.random() * Math.PI * 2,
+                strength: -0.22 - Math.random() * 0.15,
+                particles: particles,
+                hit: false,      // true — уже "поймали" (задело), доигрывает удар
+                hitTimer: 0
             });
         }
     }

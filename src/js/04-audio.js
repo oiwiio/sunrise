@@ -261,6 +261,31 @@
         noise.stop(t + 0.19);
     }
 
+    // турбулентность — низкий нисходящий гул (в отличие от "пуха" облака и "свиста" термика)
+    function playTurbulenceSound() {
+        if (!audioReady) return;
+        let t = audioCtx.currentTime;
+        let bufSize = audioCtx.sampleRate * 0.28;
+        let buffer = audioCtx.createBuffer(1, bufSize, audioCtx.sampleRate);
+        let data = buffer.getChannelData(0);
+        for (let i = 0; i < bufSize; i++) data[i] = (Math.random() * 2 - 1);
+        let noise = audioCtx.createBufferSource();
+        noise.buffer = buffer;
+        let filter = audioCtx.createBiquadFilter();
+        filter.type = 'lowpass';
+        filter.frequency.setValueAtTime(420, t);
+        filter.frequency.exponentialRampToValueAtTime(90, t + 0.28);
+        let gain = audioCtx.createGain();
+        gain.gain.setValueAtTime(0.001, t);
+        gain.gain.linearRampToValueAtTime(0.28, t + 0.03);
+        gain.gain.exponentialRampToValueAtTime(0.001, t + 0.28);
+        noise.connect(filter);
+        filter.connect(gain);
+        gain.connect(audioCtx.destination);
+        noise.start(t);
+        noise.stop(t + 0.29);
+    }
+
     // смерть — низкий нисходящий тон
     function playDeathSound() {
         if (!audioReady) return;
@@ -292,4 +317,3 @@
         gameRunning = true;
         restartGame();
     }
-    

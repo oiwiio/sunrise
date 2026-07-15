@@ -167,19 +167,43 @@
         }
     }
         
-        // потоки
+        // потоки — нарастающая просадка и болтанка по мере приближения к ядру
         for (let i = 0; i < downdrafts.length; i++) {
             let d = downdrafts[i];
-            let dx = player.x - d.x;
-            let dy = player.y - d.y;
-            if (Math.hypot(dx, dy) < d.radius + 9) {
-                player.vy += Math.abs(d.strength) * 0.55;
-                score = Math.max(0, score - 5);
-                addNegativeSpark(d.x, d.y);
-                downdrafts.splice(i, 1);
-                i--;
+
+            for (let p of d.particles) {
+                p.angle += p.spin * dt * 0.02;
+            }
+
+            if (d.hit) {
+                // короткая "встряска" после удара, потом поток убирается
+                d.hitTimer += delta;
+                if (d.hitTimer > 0.3) { downdrafts.splice(i, 1); i--; }
                 continue;
             }
+
+            let dx = player.x - d.x;
+            let dy = player.y - d.y;
+            let dist = Math.hypot(dx, dy);
+
+            if (dist < d.pullRadius) {
+                // чем ближе к ядру — тем сильнее просадка и болтанка
+                const proximity = 1 - Math.max(0, dist - d.coreRadius) / (d.pullRadius - d.coreRadius);
+                player.vy += Math.abs(d.strength) * (0.1 + proximity * proximity * 0.5) * dt;
+                player.vx += (Math.random() - 0.5) * proximity * 0.15 * dt; // болтанка из стороны в сторону
+            }
+
+            if (dist < d.coreRadius) {
+                // попадание в ядро: резкий толчок вниз + штраф очков + встряска
+                d.hit      = true;
+                d.hitTimer = 0;
+                player.vy += Math.abs(d.strength) * 0.6;
+                score = Math.max(0, score - 5);
+                addNegativeSpark(d.x, d.y);
+                playTurbulenceSound();
+                continue;
+            }
+
             if (d.x < cameraX - 200) {
                 downdrafts.splice(i, 1);
                 i--;

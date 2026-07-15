@@ -508,7 +508,7 @@
                 continue;
             }
 
-            // шлейф тёплого воздуха, "исходящий от земли" к термику ──
+            // шлейф тёплого воздуха, "исходящий от земли" к термику 
             let shaftGrad = ctx.createLinearGradient(screenX, screenY + t.pullRadius * 1.6, screenX, screenY - t.coreRadius);
             shaftGrad.addColorStop(0, biomColorA('thermalColor', 0));
             shaftGrad.addColorStop(1, biomColorA('thermalColor', 0.16));
@@ -530,7 +530,7 @@
             ctx.stroke();
             ctx.setLineDash([]);
 
-            // концентрические волны, расширяющиеся от центра наружу
+            // концентрические волны, расширяющиеся от центра наружу 
             for (let r = 0; r < 3; r++) {
                 const ringPhase  = ((frame * 0.006) + t.pulse * 0.1 + r / 3) % 1;
                 const ringRadius = t.coreRadius + ringPhase * (t.pullRadius - t.coreRadius);
@@ -578,14 +578,96 @@
             ctx.restore();
         }
         
-        // турбулентность (только рендер)
+        // турбулентность — закручивающийся вихрь, тянущий вниз
         for (let d of downdrafts) {
             let screenX = d.x - cameraX;
             let screenY = d.y - camY;
+
+            ctx.save();
+
+            // попадание: короткая встряска-вспышка вместо обычного вихря 
+            if (d.hit) {
+                const ft = d.hitTimer / 0.3; // 0..1
+                const shockR = d.pullRadius * (0.35 + ft * 0.9);
+                let shockGrad = ctx.createRadialGradient(screenX, screenY, 0, screenX, screenY, shockR);
+                shockGrad.addColorStop(0, `rgba(90, 100, 150, ${Math.max(0, 1 - ft) * 0.65})`);
+                shockGrad.addColorStop(1, 'rgba(90, 100, 150, 0)');
+                ctx.fillStyle = shockGrad;
+                ctx.beginPath();
+                ctx.arc(screenX, screenY, shockR, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+                continue;
+            }
+
+            // тёмное пульсирующее ядро 
+            const corePulse = 0.9 + Math.sin(frame * 0.05 + d.pulse) * 0.12;
+            let coreGrad = ctx.createRadialGradient(screenX, screenY, 0, screenX, screenY, d.coreRadius * corePulse);
+            coreGrad.addColorStop(0, 'rgba(55, 65, 105, 0.55)');
+            coreGrad.addColorStop(1, 'rgba(55, 65, 105, 0)');
+            ctx.fillStyle = coreGrad;
             ctx.beginPath();
-            ctx.arc(screenX, screenY, d.radius - 5, 0, Math.PI * 2);
-            ctx.fillStyle = 'rgba(90, 110, 150, 0.24)';
+            ctx.arc(screenX, screenY, d.coreRadius * corePulse, 0, Math.PI * 2);
             ctx.fill();
+
+            // неровный дрожащий контур зоны турбулентности 
+            ctx.beginPath();
+            const jSegs = 22;
+            for (let s = 0; s <= jSegs; s++) {
+                const ang = (s / jSegs) * Math.PI * 2;
+                const jitter = Math.sin(frame * 0.16 + ang * 5 + d.pulse) * 3;
+                const r = d.pullRadius + jitter;
+                const px = screenX + Math.cos(ang) * r;
+                const py = screenY + Math.sin(ang) * r;
+                if (s === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+            }
+            ctx.strokeStyle = 'rgba(115, 135, 185, 0.16)';
+            ctx.lineWidth = 1.2;
+            ctx.stroke();
+
+            // спиральные завитки, закручивающиеся в разные стороны 
+            for (let r = 0; r < 2; r++) {
+                ctx.beginPath();
+                const spiralTurns  = 1.3;
+                const spiralPoints = 18;
+                const rot = frame * 0.02 * (r % 2 === 0 ? 1 : -1) + d.pulse + r * Math.PI;
+                for (let s = 0; s <= spiralPoints; s++) {
+                    const p    = s / spiralPoints;
+                    const ang  = rot + p * Math.PI * 2 * spiralTurns;
+                    const rad  = d.coreRadius + p * (d.pullRadius - d.coreRadius);
+                    const px   = screenX + Math.cos(ang) * rad;
+                    const py   = screenY + Math.sin(ang) * rad;
+                    if (s === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+                }
+                ctx.strokeStyle = `rgba(120, 140, 200, ${0.26 - r * 0.08})`;
+                ctx.lineWidth = 1.6;
+                ctx.stroke();
+            }
+
+            // частицы, хаотично кружащиеся внутри вихря 
+            for (let p of d.particles) {
+                const rad = d.coreRadius + (Math.sin(p.angle * 0.7) * 0.5 + 0.5) * (d.pullRadius - d.coreRadius);
+                const px  = screenX + Math.cos(p.angle) * rad;
+                const py  = screenY + Math.sin(p.angle) * rad + Math.sin(frame * 0.1 + p.angle) * 3;
+                ctx.beginPath();
+                ctx.arc(px, py, p.size, 0, Math.PI * 2);
+                ctx.fillStyle = 'rgba(140, 160, 210, 0.5)';
+                ctx.fill();
+            }
+
+            // подсказка: шеврон ВНИЗ — предупреждает, что тянет вниз 
+            const hintY = screenY + d.pullRadius + 14 + Math.sin(frame * 0.04 + d.pulse) * 3;
+            ctx.beginPath();
+            ctx.moveTo(screenX - 8, hintY - 6);
+            ctx.lineTo(screenX, hintY + 6);
+            ctx.lineTo(screenX + 8, hintY - 6);
+            ctx.strokeStyle = 'rgba(140, 160, 210, 0.55)';
+            ctx.lineWidth = 2;
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+            ctx.stroke();
+
+            ctx.restore();
         }
         
         //отрисовка флага рекорда
