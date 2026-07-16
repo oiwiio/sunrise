@@ -1,3 +1,4 @@
+// ── 04-audio.js ──────────────────────────────────────────────
 // Всё про звук: Web Audio API, ветер (mp3), амбиент-слои по биомам,
 // звуки термика/облака/смерти.
 // Зависит от: 01-core.js (WIND_MP3_URL), 03-biomes.js (BIOM_AMBIENT, biomColorA).
@@ -238,27 +239,53 @@
     }
 
     // удар об облако — глухой шлепок (белый шум + фильтр)
+    // столкновение с облаком — мягкий приглушённый "пуфф" (воздушный слой + низкий "тук" для телесности)
     function playCloudHitSound() {
         if (!audioReady) return;
         let t = audioCtx.currentTime;
-        let bufSize = audioCtx.sampleRate * 0.18;
-        let buffer = audioCtx.createBuffer(1, bufSize, audioCtx.sampleRate);
-        let data = buffer.getChannelData(0);
+
+        // воздушный слой — приглушённый шум с мягкой (не щелчковой) атакой
+        let bufSize = audioCtx.sampleRate * 0.26;
+        let buffer  = audioCtx.createBuffer(1, bufSize, audioCtx.sampleRate);
+        let data    = buffer.getChannelData(0);
         for (let i = 0; i < bufSize; i++) data[i] = (Math.random() * 2 - 1);
+
         let noise = audioCtx.createBufferSource();
         noise.buffer = buffer;
-        let filter = audioCtx.createBiquadFilter();
-        filter.type = 'bandpass';
-        filter.frequency.value = 280;
-        filter.Q.value = 0.8;
-        let gain = audioCtx.createGain();
-        gain.gain.setValueAtTime(0.22, t);
-        gain.gain.exponentialRampToValueAtTime(0.001, t + 0.18);
-        noise.connect(filter);
-        filter.connect(gain);
-        gain.connect(audioCtx.destination);
+
+        let noiseFilter = audioCtx.createBiquadFilter();
+        noiseFilter.type = 'lowpass';               // lowpass вместо bandpass — убирает "пластиковый" треск
+        noiseFilter.frequency.setValueAtTime(1100, t);
+        noiseFilter.frequency.exponentialRampToValueAtTime(220, t + 0.26);
+        noiseFilter.Q.value = 0.5;
+
+        let noiseGain = audioCtx.createGain();
+        noiseGain.gain.setValueAtTime(0.0001, t);
+        noiseGain.gain.linearRampToValueAtTime(0.20, t + 0.025); // мягкая атака — не щелчок, а "уф"
+        noiseGain.gain.exponentialRampToValueAtTime(0.001, t + 0.26);
+
+        noise.connect(noiseFilter);
+        noiseFilter.connect(noiseGain);
+        noiseGain.connect(audioCtx.destination);
+
+        // низкий "тук" снизу — даёт звуку телесность, а не только шипение
+        let thump = audioCtx.createOscillator();
+        thump.type = 'sine';
+        thump.frequency.setValueAtTime(170, t);
+        thump.frequency.exponentialRampToValueAtTime(70, t + 0.14);
+
+        let thumpGain = audioCtx.createGain();
+        thumpGain.gain.setValueAtTime(0.0001, t);
+        thumpGain.gain.linearRampToValueAtTime(0.28, t + 0.012);
+        thumpGain.gain.exponentialRampToValueAtTime(0.001, t + 0.16);
+
+        thump.connect(thumpGain);
+        thumpGain.connect(audioCtx.destination);
+
         noise.start(t);
-        noise.stop(t + 0.19);
+        noise.stop(t + 0.27);
+        thump.start(t);
+        thump.stop(t + 0.17);
     }
 
     // турбулентность — низкий нисходящий гул (в отличие от "пуха" облака и "свиста" термика)
