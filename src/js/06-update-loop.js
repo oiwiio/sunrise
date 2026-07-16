@@ -53,7 +53,7 @@
 
         //управление по вертикали
         if (isPressing) {
-            player.vy += 0.26 * dt;                                    // пикирование — чуть мягче
+            player.vy += 0.18 * dt;                                    // пикирование — чуть мягче
             player.angle = Math.min(0.65, player.angle + 0.06 * dt);  // быстрее отклик
         } else {
             player.vy -= 0.20 * dt;                                    // подъём — заметно сильнее
