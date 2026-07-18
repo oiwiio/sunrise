@@ -250,6 +250,7 @@
         }
         addCloudIfNeeded();
         
+        updateEvents(delta, dt);
         updateDifficulty();
         updateBiom();
 

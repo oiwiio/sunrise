@@ -34,6 +34,7 @@
         biomTransition     = 1;
         biomNoticeTimer    = 0;
         biomParticles      = [];
+        resetEvents();
         initMountains();
         for (let i = 0; i < 2; i++) addThermalIfNeeded();
     }
