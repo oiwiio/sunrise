@@ -18,9 +18,6 @@
         // во время меню — рисуем игровой мир как фон, потом накладываем UI
         // (early return убран — меню теперь оверлей поверх живого мира)
         
-        drawActiveEvent();
-        drawEventNotice();
-
         const camY = getCameraY();
         
         // небо — биом (кеш, не пересоздаём каждый кадр)
@@ -1025,6 +1022,12 @@
             vignette.addColorStop(1, `rgba(110, 10, 10, ${vignetteStrength.toFixed(3)})`);
             ctx.fillStyle = vignette;
             ctx.fillRect(0, 0, LOGICAL_W, LOGICAL_H);
+        }
+
+        // события — поверх игры, под меню
+        if (!showWelcome) {
+            drawActiveEvent();
+            drawEventNotice();
         }
 
         // приветственный экран — поверх всего

@@ -1,10 +1,9 @@
-// ── 10-events.js ─────────────────────────────────────────────
 // Система случайных событий.
 // Событие срабатывает когда score достигает nextEventAt,
 // который генерируется случайно после каждого события.
 // Зависит от: 01-core.js, 02-player-state.js, 05-world-entities.js.
 
-    // ── состояние системы ──
+    // состояние системы 
     let nextEventAt     = 0;      // порог очков для следующего события
     let activeEvent     = null;   // текущее активное событие или null
     let activeEventTimer = 0;     // сколько секунд уже идёт
@@ -47,7 +46,7 @@
         return table[0];
     }
 
-    // ── запуск события ──
+    // запуск события 
     function triggerEvent(eventDef) {
         activeEvent      = { ...eventDef };
         activeEventTimer = 0;
@@ -100,7 +99,7 @@
         showEventNotice(eventDef.id);
     }
 
-    // ── тик события — вызывается каждый кадр из updateGame ──
+    // тик события — вызывается каждый кадр из updateGame 
     function updateEvents(delta, dt) {
         if (!eventsEnabled || !gameRunning || isDying) return;
 
@@ -213,7 +212,7 @@
         }
     }
 
-    // ── уведомление на экране ──
+    // уведомление на экране 
     let eventNoticeTimer = 0;
     let eventNoticeText  = '';
     let eventNoticeColor = '#FFD9B5';
@@ -241,22 +240,50 @@
 
     function drawEventNotice() {
         if (eventNoticeTimer <= 0) return;
-        eventNoticeTimer -= 1 / 60; // убывает каждый кадр (approx)
-        const alpha = Math.min(1, eventNoticeTimer / 0.4) * Math.min(1, eventNoticeTimer);
-        const s = UI_SCALE;
+        eventNoticeTimer -= 1 / 60;
+        const s     = UI_SCALE;
+        const alpha = Math.min(1, eventNoticeTimer / 0.35) * Math.min(1, eventNoticeTimer * 1.5);
+        if (alpha <= 0) return;
+
+        const cx  = LOGICAL_W / 2;
+        const cy  = Math.round(LOGICAL_H * 0.14);
+        const pad = Math.round(14 * s);
+
         ctx.save();
-        ctx.textAlign = 'center';
-        ctx.font = `bold ${Math.round(15*s)}px monospace`;
-        ctx.fillStyle = eventNoticeColor.replace(')', `, ${alpha})`).replace('#', 'rgba(').replace(/rgba\(([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2}),/, (_, r, g, b) =>
-            `rgba(${parseInt(r,16)},${parseInt(g,16)},${parseInt(b,16)},`);
-        // проще — используем globalAlpha
         ctx.globalAlpha = alpha;
-        ctx.fillStyle   = eventNoticeColor;
-        ctx.shadowBlur  = 8;
+
+        // измеряем текст
+        ctx.font = `bold ${Math.round(14*s)}px monospace`;
+        const tw = ctx.measureText(eventNoticeText).width;
+        const bw = tw + pad * 2;
+        const bh = Math.round(32 * s);
+
+        // подложка — тёмная таблетка с цветной рамкой
+        ctx.fillStyle = 'rgba(5,3,15,0.75)';
+        ctx.beginPath();
+        ctx.roundRect(cx - bw/2, cy - bh/2, bw, bh, Math.round(bh/2));
+        ctx.fill();
+
+        ctx.strokeStyle = eventNoticeColor;
+        ctx.lineWidth   = 1.5;
+        ctx.beginPath();
+        ctx.roundRect(cx - bw/2, cy - bh/2, bw, bh, Math.round(bh/2));
+        ctx.stroke();
+
+        // лёгкое свечение рамки
+        ctx.shadowBlur  = 10;
         ctx.shadowColor = eventNoticeColor;
-        ctx.fillText(eventNoticeText, LOGICAL_W / 2, LOGICAL_H * 0.18);
+        ctx.stroke();
         ctx.shadowBlur  = 0;
-        ctx.globalAlpha = 1;
+
+        // текст
+        ctx.fillStyle  = eventNoticeColor;
+        ctx.textAlign  = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(eventNoticeText, cx, cy);
+
+        ctx.textBaseline = 'alphabetic';
+        ctx.globalAlpha  = 1;
         ctx.restore();
     }
 
@@ -336,7 +363,7 @@
         }
     }
 
-    // ── сброс при рестарте ──
+    // сброс при рестарте 
     function resetEvents() {
         activeEvent      = null;
         activeEventTimer = 0;
