@@ -79,7 +79,7 @@
                 activeEvent.duration = 2 + Math.random() * 2;
                 const dirs = ['up', 'down', 'forward'];
                 activeEvent.dir      = dirs[Math.floor(Math.random() * dirs.length)];
-                activeEvent.strength = 0.15 + Math.random() * 0.15;
+                activeEvent.strength = 0.07 + Math.random() * 0.07;
                 break;
 
             case 'turbulence':
@@ -183,8 +183,8 @@
                     let t = activeEventTimer / activeEvent.duration;
                     let env = Math.sin(t * Math.PI);
                     let f   = activeEvent.strength * env * dt;
-                    if      (activeEvent.dir === 'up')      player.vy -= f * 1.5;
-                    else if (activeEvent.dir === 'down')    player.vy += f;
+                    if      (activeEvent.dir === 'up')      player.vy -= f * 0.6;
+                    else if (activeEvent.dir === 'down')    player.vy += f * 0.5;
                     else if (activeEvent.dir === 'forward') player.vx += f * 0.5;
                 }
                 break;
