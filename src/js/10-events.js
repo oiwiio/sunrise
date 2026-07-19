@@ -229,58 +229,285 @@
     };
 
     function showEventNotice(eventId) {
-        let key = eventId;
-        if (eventId === 'wind_gust' && activeEvent) key = 'wind_gust_' + activeEvent.dir;
-        const def = EVENT_LABELS[key] || EVENT_LABELS[eventId];
-        if (!def) return;
-        eventNoticeText  = def.text;
-        eventNoticeColor = def.color;
-        eventNoticeTimer = 2.2;  // секунд
+        eventNoticeEventId = eventId;
+        eventNoticeDur     = EVENT_NOTICE_DUR[eventId] || 2.2;
+        eventNoticeTimer   = eventNoticeDur;
+        // для дефолта
+        const def = EVENT_LABELS[eventId] || EVENT_LABELS[eventId + '_forward'];
+        if (def) { eventNoticeText = def.text; eventNoticeColor = def.color; }
     }
+
+    // полное время жизни уведомления по типу события
+    const EVENT_NOTICE_DUR = {
+        golden_thermal: 2.8,
+        tailwind:       2.2,
+        lightness:      2.5,
+        wind_gust:      1.8,
+        turbulence:     2.0,
+        headwind:       2.0,
+    };
+    let eventNoticeDur     = 2.2;  // длительность текущего
+    let eventNoticeEventId = '';   // id текущего события для switch в draw
 
     function drawEventNotice() {
         if (eventNoticeTimer <= 0) return;
         eventNoticeTimer -= 1 / 60;
-        const s     = UI_SCALE;
-        const alpha = Math.min(1, eventNoticeTimer / 0.35) * Math.min(1, eventNoticeTimer * 1.5);
+        if (eventNoticeTimer <= 0) return;
+
+        const s    = UI_SCALE;
+        const t    = 1 - eventNoticeTimer / eventNoticeDur; // 0=начало 1=конец
+        const fadeIn  = Math.min(1, (1 - t) / 0.15);       // быстро появляется
+        const fadeOut = Math.min(1, eventNoticeTimer / 0.3); // плавно исчезает
+        const alpha   = Math.min(fadeIn, fadeOut);
         if (alpha <= 0) return;
 
-        const cx  = LOGICAL_W / 2;
-        const cy  = Math.round(LOGICAL_H * 0.14);
-        const pad = Math.round(14 * s);
+        const cx = LOGICAL_W / 2;
+        const cy = Math.round(LOGICAL_H * 0.13);
 
         ctx.save();
-        ctx.globalAlpha = alpha;
 
-        // измеряем текст
-        ctx.font = `bold ${Math.round(14*s)}px monospace`;
-        const tw = ctx.measureText(eventNoticeText).width;
-        const bw = tw + pad * 2;
-        const bh = Math.round(32 * s);
+        switch (eventNoticeEventId) {
 
-        // подложка — тёмная таблетка с цветной рамкой
-        ctx.fillStyle = 'rgba(5,3,15,0.75)';
-        ctx.beginPath();
-        ctx.roundRect(cx - bw/2, cy - bh/2, bw, bh, Math.round(bh/2));
-        ctx.fill();
+            // ✦ ЗОЛОТОЙ ТЕРМИК — вспышка + сияние 
+            case 'golden_thermal': {
+                // вспышка в начале
+                const flash = Math.max(0, 1 - t / 0.12) * 0.5;
+                if (flash > 0) {
+                    ctx.fillStyle = `rgba(255,220,80,${flash})`;
+                    ctx.fillRect(0, 0, LOGICAL_W, LOGICAL_H);
+                }
 
-        ctx.strokeStyle = eventNoticeColor;
-        ctx.lineWidth   = 1.5;
-        ctx.beginPath();
-        ctx.roundRect(cx - bw/2, cy - bh/2, bw, bh, Math.round(bh/2));
-        ctx.stroke();
+                ctx.globalAlpha = alpha;
 
-        // лёгкое свечение рамки
-        ctx.shadowBlur  = 10;
-        ctx.shadowColor = eventNoticeColor;
-        ctx.stroke();
-        ctx.shadowBlur  = 0;
+                // пульсирующий ореол
+                const haloR = Math.round(60 * s) + Math.sin(frame * 0.15) * 4;
+                const halo  = ctx.createRadialGradient(cx, cy, 0, cx, cy, haloR);
+                halo.addColorStop(0,   'rgba(255,210,60,0.35)');
+                halo.addColorStop(0.5, 'rgba(255,180,30,0.12)');
+                halo.addColorStop(1,   'rgba(255,150,0,0)');
+                ctx.fillStyle = halo;
+                ctx.beginPath(); ctx.arc(cx, cy, haloR, 0, Math.PI*2); ctx.fill();
 
-        // текст
-        ctx.fillStyle  = eventNoticeColor;
-        ctx.textAlign  = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText(eventNoticeText, cx, cy);
+                // звёзды вокруг
+                for (let i = 0; i < 6; i++) {
+                    const a  = (i/6)*Math.PI*2 + frame * 0.04;
+                    const r  = Math.round(32*s) + Math.sin(frame*0.08+i)*4;
+                    const sx = cx + Math.cos(a)*r;
+                    const sy = cy + Math.sin(a)*r;
+                    const sa = 0.5 + Math.sin(frame*0.1+i*1.1)*0.4;
+                    ctx.fillStyle = `rgba(255,220,80,${sa * alpha})`;
+                    ctx.font = `${Math.round(10*s)}px monospace`;
+                    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                    ctx.fillText('✦', sx, sy);
+                }
+
+                // основной текст — крупный, золотой, с свечением
+                ctx.shadowBlur  = 18; ctx.shadowColor = '#FFD700';
+                ctx.fillStyle   = '#FFE566';
+                ctx.font        = `bold ${Math.round(18*s)}px monospace`;
+                ctx.textAlign   = 'center'; ctx.textBaseline = 'middle';
+                ctx.fillText('✦  ЗОЛОТОЙ ТЕРМИК  ✦', cx, cy);
+                ctx.shadowBlur  = 0;
+                break;
+            }
+
+            // ▶▶ ПОПУТНЫЙ ВЕТЕР — поток стрелок слева направо 
+            case 'tailwind': {
+                ctx.globalAlpha = alpha;
+
+                // стрелки летят справа налево (ветер сзади)
+                const arrows = 5;
+                for (let i = 0; i < arrows; i++) {
+                    // каждая стрелка со своим смещением и фазой
+                    const phase  = (i / arrows) + t * 1.5;
+                    const xOff   = ((phase % 1) - 0.5) * Math.round(220*s);
+                    const yOff   = (i - arrows/2) * Math.round(10*s);
+                    const aAlpha = Math.sin((phase % 1) * Math.PI) * alpha;
+                    if (aAlpha <= 0) continue;
+
+                    ctx.globalAlpha = aAlpha;
+                    ctx.strokeStyle = 'rgba(120,220,255,0.9)';
+                    ctx.lineWidth   = Math.round(2*s);
+                    ctx.lineCap     = 'round';
+                    ctx.lineJoin    = 'round';
+
+                    const ax = cx + xOff;
+                    const ay = cy + yOff;
+                    const aw = Math.round(24*s);
+
+                    // стрелка →
+                    ctx.beginPath();
+                    ctx.moveTo(ax - aw, ay);
+                    ctx.lineTo(ax, ay);
+                    ctx.lineTo(ax - aw*0.4, ay - aw*0.35);
+                    ctx.moveTo(ax, ay);
+                    ctx.lineTo(ax - aw*0.4, ay + aw*0.35);
+                    ctx.stroke();
+                }
+
+                ctx.globalAlpha = alpha;
+                // текст
+                ctx.fillStyle    = 'rgba(120,220,255,0.95)';
+                ctx.font         = `bold ${Math.round(14*s)}px monospace`;
+                ctx.textAlign    = 'center'; ctx.textBaseline = 'middle';
+                ctx.shadowBlur   = 8; ctx.shadowColor = 'rgba(80,180,255,0.8)';
+                ctx.fillText('ПОПУТНЫЙ ВЕТЕР', cx, cy + Math.round(22*s));
+                ctx.shadowBlur   = 0;
+                break;
+            }
+
+            // ◈ ЛЁГКОСТЬ — перья/пузыри всплывают вверх 
+            case 'lightness': {
+                ctx.globalAlpha = alpha;
+
+                // пузырьки поднимаются
+                for (let i = 0; i < 8; i++) {
+                    const phase = ((i/8 + t * 0.6) % 1);
+                    const bx    = cx + (i - 3.5) * Math.round(18*s);
+                    const by    = cy + Math.round(30*s) - phase * Math.round(60*s);
+                    const br    = Math.round((2 + (i%3)) * s);
+                    const ba    = Math.sin(phase * Math.PI) * alpha;
+                    ctx.globalAlpha = ba;
+                    ctx.beginPath(); ctx.arc(bx, by, br, 0, Math.PI*2);
+                    ctx.fillStyle = 'rgba(200,160,255,0.8)'; ctx.fill();
+                }
+
+                ctx.globalAlpha = alpha;
+                ctx.shadowBlur  = 12; ctx.shadowColor = 'rgba(180,120,255,0.7)';
+                ctx.fillStyle   = '#D4A8FF';
+                ctx.font        = `bold ${Math.round(16*s)}px monospace`;
+                ctx.textAlign   = 'center'; ctx.textBaseline = 'middle';
+                ctx.fillText('◈  ЛЁГКОСТЬ', cx, cy);
+                ctx.shadowBlur  = 0;
+                break;
+            }
+
+            // ↑↓→ ПОРЫВ ВЕТРА — быстрые линии в нужном направлении 
+            case 'wind_gust': {
+                ctx.globalAlpha = alpha;
+                const dir = activeEvent ? activeEvent.dir : 'forward';
+
+                // линии порыва
+                for (let i = 0; i < 6; i++) {
+                    const phase = ((i/6 + t * 2) % 1);
+                    const len   = Math.round((30 + i*8) * s);
+                    let lx = cx + (i-2.5)*Math.round(20*s);
+                    let ly = cy;
+                    let dx2 = 0, dy2 = 0;
+                    if (dir === 'up')      { dy2 = -len; lx = cx + (i-2.5)*Math.round(16*s); }
+                    if (dir === 'down')    { dy2 =  len; lx = cx + (i-2.5)*Math.round(16*s); }
+                    if (dir === 'forward') { dx2 =  len; ly = cy + (i-2.5)*Math.round(10*s); }
+
+                    const la = Math.sin(phase * Math.PI) * alpha;
+                    ctx.globalAlpha = la;
+                    ctx.strokeStyle = 'rgba(255,230,120,0.9)';
+                    ctx.lineWidth   = Math.round(1.5*s);
+                    ctx.lineCap     = 'round';
+                    ctx.beginPath();
+                    ctx.moveTo(lx, ly); ctx.lineTo(lx + dx2, ly + dy2);
+                    ctx.stroke();
+                }
+
+                ctx.globalAlpha = alpha;
+                const label = dir === 'up' ? '↑ ПОРЫВ ВВЕРХ' : dir === 'down' ? '↓ ПОРЫВ ВНИЗ' : '→ ПОРЫВ ВПЕРЁД';
+                ctx.fillStyle    = 'rgba(255,220,100,0.95)';
+                ctx.font         = `bold ${Math.round(13*s)}px monospace`;
+                ctx.textAlign    = 'center'; ctx.textBaseline = 'middle';
+                ctx.fillText(label, cx, cy + Math.round(28*s));
+                break;
+            }
+
+            // ⚡ ТУРБУЛЕНТНОСТЬ — экран трясётся, красные вспышки 
+            case 'turbulence': {
+                // красноватый оверлей в начале
+                const shake = Math.max(0, 1 - t / 0.4) * 0.18;
+                if (shake > 0) {
+                    ctx.fillStyle = `rgba(255,60,60,${shake * alpha})`;
+                    ctx.fillRect(0, 0, LOGICAL_W, LOGICAL_H);
+                }
+
+                ctx.globalAlpha = alpha;
+                // молнии
+                for (let i = 0; i < 3; i++) {
+                    const lx  = cx + (i-1)*Math.round(40*s) + Math.sin(frame*0.3+i)*3;
+                    const top = cy - Math.round(20*s);
+                    ctx.strokeStyle = `rgba(255,80,80,${0.6 + Math.sin(frame*0.5+i)*0.4})`;
+                    ctx.lineWidth   = Math.round(1.5*s);
+                    ctx.beginPath();
+                    ctx.moveTo(lx,   top);
+                    ctx.lineTo(lx-4, top + Math.round(12*s));
+                    ctx.lineTo(lx+3, top + Math.round(12*s));
+                    ctx.lineTo(lx-2, top + Math.round(22*s));
+                    ctx.stroke();
+                }
+
+                ctx.shadowBlur  = 10; ctx.shadowColor = 'rgba(255,80,80,0.8)';
+                ctx.fillStyle   = '#FF8888';
+                ctx.font        = `bold ${Math.round(14*s)}px monospace`;
+                ctx.textAlign   = 'center'; ctx.textBaseline = 'middle';
+                ctx.fillText('⚡ ТУРБУЛЕНТНОСТЬ', cx, cy + Math.round(28*s));
+                ctx.shadowBlur  = 0;
+                break;
+            }
+
+            // ◀◀ ВСТРЕЧНЫЙ ВЕТЕР — стрелки летят навстречу 
+            case 'headwind': {
+                ctx.globalAlpha = alpha;
+
+                for (let i = 0; i < 5; i++) {
+                    const phase  = ((i/5 + t * 1.5) % 1);
+                    const xOff   = ((1 - phase % 1) - 0.5) * Math.round(220*s);
+                    const yOff   = (i - 2) * Math.round(10*s);
+                    const aAlpha = Math.sin((phase % 1) * Math.PI) * alpha;
+                    if (aAlpha <= 0) continue;
+
+                    ctx.globalAlpha = aAlpha;
+                    ctx.strokeStyle = 'rgba(255,120,120,0.9)';
+                    ctx.lineWidth   = Math.round(2*s);
+                    ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+
+                    const ax = cx + xOff;
+                    const ay = cy + yOff;
+                    const aw = Math.round(24*s);
+                    // стрелка ←
+                    ctx.beginPath();
+                    ctx.moveTo(ax + aw, ay);
+                    ctx.lineTo(ax, ay);
+                    ctx.lineTo(ax + aw*0.4, ay - aw*0.35);
+                    ctx.moveTo(ax, ay);
+                    ctx.lineTo(ax + aw*0.4, ay + aw*0.35);
+                    ctx.stroke();
+                }
+
+                ctx.globalAlpha = alpha;
+                ctx.fillStyle    = 'rgba(255,120,120,0.95)';
+                ctx.font         = `bold ${Math.round(14*s)}px monospace`;
+                ctx.textAlign    = 'center'; ctx.textBaseline = 'middle';
+                ctx.shadowBlur   = 8; ctx.shadowColor = 'rgba(255,80,80,0.7)';
+                ctx.fillText('◀◀ ВСТРЕЧНЫЙ ВЕТЕР', cx, cy + Math.round(22*s));
+                ctx.shadowBlur   = 0;
+                break;
+            }
+
+            // дефолт — простая таблетка
+            default: {
+                ctx.globalAlpha = alpha;
+                ctx.fillStyle   = 'rgba(5,3,15,0.8)';
+                ctx.font        = `bold ${Math.round(13*s)}px monospace`;
+                const tw = ctx.measureText(eventNoticeText).width;
+                const bw = tw + Math.round(24*s);
+                const bh = Math.round(28*s);
+                ctx.beginPath();
+                ctx.roundRect(cx-bw/2, cy-bh/2, bw, bh, bh/2);
+                ctx.fill();
+                ctx.strokeStyle = eventNoticeColor;
+                ctx.lineWidth = 1.2;
+                ctx.stroke();
+                ctx.fillStyle    = eventNoticeColor;
+                ctx.textAlign    = 'center'; ctx.textBaseline = 'middle';
+                ctx.fillText(eventNoticeText, cx, cy);
+            }
+        }
 
         ctx.textBaseline = 'alphabetic';
         ctx.globalAlpha  = 1;
