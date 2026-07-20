@@ -419,6 +419,66 @@
     // дальние горы
     drawMtnLayer(farPts, biomColor('farMtn'), null);
 
+    // ДОЖДЬ (вместо водопада, между дальними и ближними горами)
+    {
+        // дождь активен по тем же таймингам, что раньше был водопад
+        const WCYCLE    = 10000;
+        const WSTART    = 2000;
+        const WFADE_IN  = 500;   // очков на появление
+        const WEND      = 7500;
+        const WFADE_OUT = 500;
+        const wPhase = score % WCYCLE;
+
+        let wAlpha = 0;
+        if (wPhase >= WSTART && wPhase < WSTART + WFADE_IN) {
+            wAlpha = (wPhase - WSTART) / WFADE_IN;
+        } else if (wPhase >= WSTART + WFADE_IN && wPhase < WEND) {
+            wAlpha = 1;
+        } else if (wPhase >= WEND && wPhase < WEND + WFADE_OUT) {
+            wAlpha = 1 - (wPhase - WEND) / WFADE_OUT;
+        }
+
+        if (wAlpha > 0) {
+            ctx.save();
+
+            // лёгкое затемнение экрана, пока идёт дождь
+            ctx.globalAlpha = 1;
+            ctx.fillStyle = `rgba(8, 10, 18, ${0.22 * wAlpha})`;
+            ctx.fillRect(0, 0, LOGICAL_W, LOGICAL_H);
+
+            // цвет капель — чуть холоднее ночью
+            const nightBoost = getCurBiom().id === 'night';
+            const dropColor  = nightBoost ? '185,200,225' : '205,220,235';
+
+            ctx.strokeStyle = `rgba(${dropColor},1)`;
+            ctx.lineCap = 'round';
+
+            const DROP_COUNT = 70;
+            const WIND_TILT   = 5; // небольшой наклон капель (эффект ветра)
+
+            for (let i = 0; i < DROP_COUNT; i++) {
+                // детерминированные (не мигающие) параметры каждой капли по её индексу
+                const laneX = (i * 137.51) % LOGICAL_W;       // равномерно по ширине (золотое сечение)
+                const speed = 5.5 + (i % 7) * 1.1;             // скорость падения капли
+                const len   = 14 + (i % 5) * 6;                // длина капли
+
+                // зацикленное падение сверху вниз
+                const fallY = ((frame * speed * 0.6 + i * 53) % (LOGICAL_H + 60)) - 30;
+
+                const dropAlpha = 0.35 + (i % 4) * 0.15;
+                ctx.globalAlpha = wAlpha * 0.45 * dropAlpha;
+                ctx.lineWidth = 1 + (i % 3) * 0.4;
+
+                ctx.beginPath();
+                ctx.moveTo(laneX, fallY);
+                ctx.lineTo(laneX - WIND_TILT, fallY + len);
+                ctx.stroke();
+            }
+
+            ctx.restore();
+        }
+    }
+
     // атмосферная дымка
     {
         let vis = farPts.filter(p => p.x > 0 && p.x < LOGICAL_W);
