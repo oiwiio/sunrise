@@ -3,6 +3,84 @@
 // Зависит от: всё выше (01–07).
 
     // отрисовка
+    // молнии: прицел на земле (warning) → вспышка на весь экран (flash) → зигзаг (strike)
+    function drawLightnings() {
+        const camY = getCameraY();
+        for (let l of lightnings) {
+            const screenX = l.x - cameraX;
+            const groundScreenY = l.y - camY;
+
+            if (l.state === 'warning') {
+                const wt = l.timer / LIGHTNING_WARN_DUR; // 0..1 — насколько близко удар
+
+                // мигающий слабый свет сверху экрана — намекает, откуда ударит
+                const flicker = 0.3 + Math.abs(Math.sin(frame * 0.6 + l.seed)) * 0.5;
+                ctx.save();
+                ctx.globalAlpha = flicker * Math.min(1, wt * 3);
+                let topGlow = ctx.createRadialGradient(screenX, 0, 0, screenX, 0, 90);
+                topGlow.addColorStop(0, 'rgba(210,225,255,0.9)');
+                topGlow.addColorStop(1, 'rgba(210,225,255,0)');
+                ctx.fillStyle = topGlow;
+                ctx.beginPath();
+                ctx.arc(screenX, 0, 90, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+
+                // светящийся прицел на земле — растёт по мере приближения удара
+                const reticleR = 8 + wt * 22;
+                ctx.save();
+                ctx.globalAlpha = 0.5 + wt * 0.4;
+                ctx.beginPath();
+                ctx.arc(screenX, groundScreenY, reticleR, 0, Math.PI * 2);
+                ctx.strokeStyle = 'rgba(200,220,255,0.85)';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.arc(screenX, groundScreenY, reticleR * 0.4, 0, Math.PI * 2);
+                ctx.fillStyle = 'rgba(200,220,255,0.35)';
+                ctx.fill();
+                ctx.restore();
+            }
+
+            if (l.state === 'flash') {
+                // весь экран на мгновение белеет/голубеет
+                const ft = 1 - l.timer / LIGHTNING_FLASH_DUR;
+                ctx.save();
+                ctx.globalAlpha = 0.6 * ft;
+                ctx.fillStyle = 'rgba(225,235,255,1)';
+                ctx.fillRect(0, 0, LOGICAL_W, LOGICAL_H);
+                ctx.restore();
+            }
+
+            if (l.state === 'strike') {
+                const st = 1 - l.timer / LIGHTNING_STRIKE_DUR; // 1→0, для затухания
+                ctx.save();
+                ctx.globalAlpha = Math.max(0, st);
+                ctx.strokeStyle = 'rgba(220,235,255,0.95)';
+                ctx.lineWidth = 2 + Math.random();
+                ctx.shadowBlur  = 14;
+                ctx.shadowColor = 'rgba(180,210,255,0.9)';
+
+                // зигзаг сверху вниз с 4-5 изломами
+                ctx.beginPath();
+                const segs = 5;
+                let px = screenX + (Math.random() - 0.5) * 10;
+                let py = 0;
+                ctx.moveTo(px, py);
+                for (let s = 1; s <= segs; s++) {
+                    const p = s / segs;
+                    py = groundScreenY * p;
+                    px = screenX + (Math.random() - 0.5) * 26 * (1 - p * 0.5);
+                    ctx.lineTo(px, py);
+                }
+                ctx.lineTo(screenX, groundScreenY);
+                ctx.stroke();
+                ctx.shadowBlur = 0;
+                ctx.restore();
+            }
+        }
+    }
+
     function draw() {
         // Сбрасываем трансформ в начале каждого кадра — гарантирует правильный DPR-масштаб
         // даже если предыдущий save/restore где-то нарушил стек
@@ -419,65 +497,52 @@
     // дальние горы
     drawMtnLayer(farPts, biomColor('farMtn'), null);
 
-    // ДОЖДЬ (вместо водопада, между дальними и ближними горами)
-    {
-        // дождь активен по тем же таймингам, что раньше был водопад
-        const WCYCLE    = 10000;
-        const WSTART    = 2000;
-        const WFADE_IN  = 500;   // очков на появление
-        const WEND      = 7500;
-        const WFADE_OUT = 500;
-        const wPhase = score % WCYCLE;
+    // ДОЖДЬ / ГРОЗА (вместо водопада, между дальними и ближними горами)
+    // wAlpha/isStorm считаются один раз за кадр в updateWeatherCycle() (06-update-loop.js)
+    if (wAlpha > 0) {
+        ctx.save();
 
-        let wAlpha = 0;
-        if (wPhase >= WSTART && wPhase < WSTART + WFADE_IN) {
-            wAlpha = (wPhase - WSTART) / WFADE_IN;
-        } else if (wPhase >= WSTART + WFADE_IN && wPhase < WEND) {
-            wAlpha = 1;
-        } else if (wPhase >= WEND && wPhase < WEND + WFADE_OUT) {
-            wAlpha = 1 - (wPhase - WEND) / WFADE_OUT;
+        // затемнение — во время грозы сильнее и холоднее (синее/серее)
+        const stormBoost = isStorm ? 1.6 : 1;
+        const skyTint     = isStorm ? '12, 13, 22' : '8, 10, 18';
+        ctx.globalAlpha = 1;
+        ctx.fillStyle = `rgba(${skyTint}, ${0.22 * wAlpha * stormBoost})`;
+        ctx.fillRect(0, 0, LOGICAL_W, LOGICAL_H);
+
+        // цвет капель — чуть холоднее ночью
+        const nightBoost = getCurBiom().id === 'night';
+        const dropColor  = nightBoost ? '185,200,225' : '205,220,235';
+
+        ctx.strokeStyle = `rgba(${dropColor},1)`;
+        ctx.lineCap = 'round';
+
+        const DROP_COUNT = 70;
+        const WIND_TILT   = 5; // небольшой наклон капель (эффект ветра)
+
+        for (let i = 0; i < DROP_COUNT; i++) {
+            // детерминированные (не мигающие) параметры каждой капли по её индексу
+            const laneX = (i * 137.51) % LOGICAL_W;       // равномерно по ширине (золотое сечение)
+            const speed = 5.5 + (i % 7) * 1.1;             // скорость падения капли
+            const len   = 14 + (i % 5) * 6;                // длина капли
+
+            // зацикленное падение сверху вниз
+            const fallY = ((frame * speed * 0.6 + i * 53) % (LOGICAL_H + 60)) - 30;
+
+            const dropAlpha = 0.35 + (i % 4) * 0.15;
+            ctx.globalAlpha = wAlpha * 0.45 * dropAlpha;
+            ctx.lineWidth = 1 + (i % 3) * 0.4;
+
+            ctx.beginPath();
+            ctx.moveTo(laneX, fallY);
+            ctx.lineTo(laneX - WIND_TILT, fallY + len);
+            ctx.stroke();
         }
 
-        if (wAlpha > 0) {
-            ctx.save();
-
-            // лёгкое затемнение экрана, пока идёт дождь
-            ctx.globalAlpha = 1;
-            ctx.fillStyle = `rgba(8, 10, 18, ${0.22 * wAlpha})`;
-            ctx.fillRect(0, 0, LOGICAL_W, LOGICAL_H);
-
-            // цвет капель — чуть холоднее ночью
-            const nightBoost = getCurBiom().id === 'night';
-            const dropColor  = nightBoost ? '185,200,225' : '205,220,235';
-
-            ctx.strokeStyle = `rgba(${dropColor},1)`;
-            ctx.lineCap = 'round';
-
-            const DROP_COUNT = 70;
-            const WIND_TILT   = 5; // небольшой наклон капель (эффект ветра)
-
-            for (let i = 0; i < DROP_COUNT; i++) {
-                // детерминированные (не мигающие) параметры каждой капли по её индексу
-                const laneX = (i * 137.51) % LOGICAL_W;       // равномерно по ширине (золотое сечение)
-                const speed = 5.5 + (i % 7) * 1.1;             // скорость падения капли
-                const len   = 14 + (i % 5) * 6;                // длина капли
-
-                // зацикленное падение сверху вниз
-                const fallY = ((frame * speed * 0.6 + i * 53) % (LOGICAL_H + 60)) - 30;
-
-                const dropAlpha = 0.35 + (i % 4) * 0.15;
-                ctx.globalAlpha = wAlpha * 0.45 * dropAlpha;
-                ctx.lineWidth = 1 + (i % 3) * 0.4;
-
-                ctx.beginPath();
-                ctx.moveTo(laneX, fallY);
-                ctx.lineTo(laneX - WIND_TILT, fallY + len);
-                ctx.stroke();
-            }
-
-            ctx.restore();
-        }
+        ctx.restore();
     }
+
+    // МОЛНИИ (только во время грозы, состояние считается в updateLightnings())
+    drawLightnings();
 
     // атмосферная дымка
     {

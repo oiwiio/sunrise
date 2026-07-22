@@ -2,6 +2,109 @@
 // Тут вся физика и коллизии одного кадра.
 // Зависит от: всё, что выше (02–05) + 04-audio.js (playThermalSound и т.д.).
 
+    // Погодный цикл: дождь / гроза 
+    // Общие переменные — их же читает 08-render.js, чтобы не дублировать расчёт.
+    const WCYCLE    = 10000;
+    const WSTART    = 2000;
+    const WFADE_IN  = 500;
+    const WEND      = 7500;
+    const WFADE_OUT = 500;
+
+    let wAlpha  = 0;      // непрозрачность дождя/грозы (0..1)
+    let isStorm = false;  // true — текущий цикл дождя грозовой (каждый второй)
+
+    function updateWeatherCycle() {
+        const wPhase = score % WCYCLE;
+
+        if (wPhase >= WSTART && wPhase < WSTART + WFADE_IN) {
+            wAlpha = (wPhase - WSTART) / WFADE_IN;
+        } else if (wPhase >= WSTART + WFADE_IN && wPhase < WEND) {
+            wAlpha = 1;
+        } else if (wPhase >= WEND && wPhase < WEND + WFADE_OUT) {
+            wAlpha = 1 - (wPhase - WEND) / WFADE_OUT;
+        } else {
+            wAlpha = 0;
+        }
+
+        // каждый второй цикл дождя — грозовой
+        isStorm = (Math.floor(score / WCYCLE) % 2 === 1);
+    }
+
+    // Молнии (только во время грозы)
+    // Три фазы: warning (прицел на земле + мигание сверху) → flash (весь экран) → strike (сам разряд).
+    let lightnings      = [];
+    let lightningTimer  = 0;
+    let nextLightningIn = 4; // сек до следующего удара, пересчитывается случайно
+
+    const LIGHTNING_WARN_DUR   = 0.8;  // предупреждение
+    const LIGHTNING_FLASH_DUR  = 0.1;  // вспышка на весь экран
+    const LIGHTNING_STRIKE_DUR = 0.15; // видимость самого разряда
+    const LIGHTNING_HIT_RADIUS = 60;   // px — радиус поражения вокруг точки удара
+
+    function rollNextLightning() {
+        nextLightningIn = 3 + Math.random() * 3; // 3–6 сек, как в ТЗ
+    }
+    rollNextLightning();
+
+    function spawnLightning() {
+        // X — случайно впереди игрока, в пределах видимой области
+        const x = cameraX + LOGICAL_W * 0.3 + Math.random() * LOGICAL_W * 0.5;
+
+        // Y — высота рельефа под этой точкой (бьёт "в землю", как в ТЗ)
+        let groundY = LOGICAL_H - 40;
+        for (let seg of mountainSegments) {
+            if (x >= seg.x && x < seg.x + segmentWidth) {
+                groundY = seg.y - 4;
+                break;
+            }
+        }
+
+        lightnings.push({
+            x: x,
+            y: groundY,
+            state: 'warning', // warning → flash → strike
+            timer: 0,
+            seed: Math.random() * 1000 // для случайной формы зигзага при отрисовке
+        });
+    }
+
+    function updateLightnings(delta) {
+        // спавним новые молнии только во время активной грозы
+        if (isStorm && wAlpha > 0.4) {
+            lightningTimer += delta;
+            if (lightningTimer >= nextLightningIn) {
+                lightningTimer = 0;
+                rollNextLightning();
+                spawnLightning();
+            }
+        } else {
+            lightningTimer = 0;
+        }
+
+        for (let i = 0; i < lightnings.length; i++) {
+            let l = lightnings[i];
+            l.timer += delta;
+
+            if (l.state === 'warning' && l.timer >= LIGHTNING_WARN_DUR) {
+                l.state = 'flash';
+                l.timer = 0;
+            } else if (l.state === 'flash' && l.timer >= LIGHTNING_FLASH_DUR) {
+                l.state = 'strike';
+                l.timer = 0;
+
+                // момент удара — проверяем, не задело ли персонажа
+                let dx = player.x - l.x;
+                let dy = player.y - l.y;
+                if (Math.hypot(dx, dy) < LIGHTNING_HIT_RADIUS) {
+                    triggerDeath();
+                }
+            } else if (l.state === 'strike' && l.timer >= LIGHTNING_STRIKE_DUR) {
+                lightnings.splice(i, 1);
+                i--;
+            }
+        }
+    }
+
     // запускает анимацию смерти вместо мгновенного стопа
     function triggerDeath() {
         if (isDying || !gameRunning) return;
@@ -45,6 +148,8 @@
 
         // нормализуем delta (чтобы при 60 FPS всё работало как раньше)
         let dt = Math.min(1.5, delta * 60);
+
+        updateWeatherCycle(); // дождь/гроза — считаем всегда, пока идёт игра (даже во время кувырка)
 
         if (isDying) {
             updateDeathTumble(dt, delta);
@@ -250,6 +355,7 @@
         }
         addCloudIfNeeded();
         
+        updateLightnings(delta);
         updateEvents(delta, dt);
         updateDifficulty();
         updateBiom();
