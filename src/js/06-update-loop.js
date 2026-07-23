@@ -196,7 +196,9 @@
         if (cameraX < 0) cameraX = 0;
         
         // границы по вертикали — привязаны к LOGICAL_H как в рендере
-        if (player.y < Math.round(LOGICAL_H * 0.08)) {
+        // (доля уменьшена с 0.08 до 0.035 — на телефонах с низким экраном
+        // старое значение давало слишком тесный запас по высоте)
+        if (player.y < Math.round(LOGICAL_H * 0.035)) {
             triggerDeath();
             return;
         }

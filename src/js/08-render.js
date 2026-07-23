@@ -118,8 +118,8 @@
         ctx.fillStyle = _fogGrad;
         ctx.fillRect(0, LOGICAL_H*0.55, LOGICAL_W, LOGICAL_H*0.45);
 
-        // граница
-        const HEIGHT_LIMIT = Math.round(LOGICAL_H * 0.08);
+        // граница (значение должно совпадать с проверкой в 06-update-loop.js)
+        const HEIGHT_LIMIT = Math.round(LOGICAL_H * 0.035);
 
         ctx.strokeStyle = 'rgba(255,255,255,0.75)';
         ctx.lineWidth = 1.5;
