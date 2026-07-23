@@ -27,6 +27,10 @@
         { id: 'wind_gust',       weight: 20, positive: null  }, // нейтральное
         { id: 'turbulence',      weight: 8,  positive: false },
         { id: 'headwind',        weight: 5,  positive: false },
+        // ── "мир меняется" — не бафф/дебафф игрока, а другой мир вокруг ──
+        { id: 'fog',             weight: 14, positive: false },
+        { id: 'meteor_shower',   weight: 10, positive: false },
+        { id: 'bird_flock',      weight: 13, positive: false },
     ];
 
     function pickRandomEvent() {
@@ -93,6 +97,38 @@
                 activeEvent.duration  = 3 + Math.random() * 2;
                 activeEvent.drag      = 0.012 + Math.random() * 0.008;
                 break;
+
+            case 'fog':
+                // туман — видимость падает, физика игрока не меняется
+                activeEvent.duration = 6 + Math.random() * 4; // 6–10 сек
+                break;
+
+            case 'meteor_shower':
+                // метеоритный дождь — активная опасность, требует уворота
+                activeEvent.duration    = 7 + Math.random() * 3; // 7–10 сек спавна
+                activeEvent.meteors     = [];
+                activeEvent.spawnTimer  = 0;
+                activeEvent.nextSpawnIn = 0.3;
+                break;
+
+            case 'bird_flock': {
+                // стая птиц V-образным строем, летит навстречу — надо вписаться в промежутки
+                activeEvent.birds = [];
+                const birdCount = 7;
+                const centerY   = LOGICAL_H * 0.28 + Math.random() * LOGICAL_H * 0.35;
+                for (let i = 0; i < birdCount; i++) {
+                    const side = i % 2 === 0 ? 1 : -1;
+                    const rank = Math.ceil(i / 2);
+                    activeEvent.birds.push({
+                        x: player.x + LOGICAL_W * 1.15 + rank * 34,
+                        y: centerY + side * rank * 24,
+                        wingPhase: Math.random() * Math.PI * 2,
+                        hit: false,
+                        passed: false
+                    });
+                }
+                break;
+            }
         }
 
         // показываем уведомление игроку
@@ -209,6 +245,94 @@
                     if (player.vx < 2) player.vx = 2; // не останавливаем полностью
                 }
                 break;
+
+            case 'fog':
+                // сама видимость (оверлей) считается в отрисовке — тут только таймер
+                if (activeEventTimer >= activeEvent.duration) {
+                    activeEvent = null; scheduleNextEvent(); return;
+                }
+                break;
+
+            case 'meteor_shower': {
+                // спавним новые метеоры, пока не вышло время
+                if (activeEventTimer < activeEvent.duration) {
+                    activeEvent.spawnTimer += delta;
+                    if (activeEvent.spawnTimer >= activeEvent.nextSpawnIn) {
+                        activeEvent.spawnTimer  = 0;
+                        activeEvent.nextSpawnIn = 0.32 + Math.random() * 0.36;
+                        activeEvent.meteors.push({
+                            x: cameraX + LOGICAL_W * (0.55 + Math.random() * 0.55),
+                            y: -30,
+                            vx: -(1.1 + Math.random() * 1.3),
+                            vy: 4.2 + Math.random() * 2.6,
+                            size: 5 + Math.random() * 4,
+                            seed: Math.random() * 1000
+                        });
+                    }
+                }
+
+                // двигаем и проверяем столкновения (метеоры доживают и после конца спавна)
+                for (let i = 0; i < activeEvent.meteors.length; i++) {
+                    let m = activeEvent.meteors[i];
+                    m.x += m.vx * dt;
+                    m.y += m.vy * dt;
+
+                    let dx = player.x - m.x;
+                    let dy = player.y - m.y;
+                    if (Math.hypot(dx, dy) < m.size + 14) {
+                        score = Math.max(0, score - 40);
+                        player.vx *= 0.8;
+                        player.vy += 0.6;
+                        addCloudPoof(m.x, m.y, 26);
+                        playCloudHitSound();
+                        activeEvent.meteors.splice(i, 1);
+                        i--;
+                        continue;
+                    }
+
+                    if (m.y - getCameraY() > LOGICAL_H + 60 || m.x < cameraX - 200) {
+                        activeEvent.meteors.splice(i, 1);
+                        i--;
+                    }
+                }
+
+                // событие кончается, когда время спавна вышло и все метеоры улетели/убраны
+                if (activeEventTimer >= activeEvent.duration && activeEvent.meteors.length === 0) {
+                    activeEvent = null; scheduleNextEvent(); return;
+                }
+                break;
+            }
+
+            case 'bird_flock': {
+                let allDone = true;
+                for (let b of activeEvent.birds) {
+                    if (b.hit || b.passed) continue;
+
+                    b.x -= (player.vx + 1.6) * dt;
+                    b.wingPhase += dt * 0.3;
+
+                    let dx = player.x - b.x;
+                    let dy = player.y - b.y;
+                    if (Math.hypot(dx, dy) < 16) {
+                        b.hit = true;
+                        score = Math.max(0, score - 10);
+                        player.vx *= 0.9;
+                        addNegativeSpark(b.x, b.y);
+                        playCloudHitSound();
+                    }
+
+                    if (b.x < cameraX - 100) {
+                        b.passed = true;
+                    } else {
+                        allDone = false;
+                    }
+                }
+
+                if (allDone) {
+                    activeEvent = null; scheduleNextEvent(); return;
+                }
+                break;
+            }
         }
     }
 
@@ -226,6 +350,9 @@
         wind_gust_forward: { text: '→ ПОРЫВ ВПЕРЁД',    color: '#FFE8A0' },
         turbulence:     { text: '⚡ ТУРБУЛЕНТНОСТЬ',     color: '#FF9898' },
         headwind:       { text: '◀◀ ВСТРЕЧНЫЙ ВЕТЕР',   color: '#FF9898' },
+        fog:            { text: '▒ ТУМАН',              color: '#C8D0DC' },
+        meteor_shower:  { text: '☄ МЕТЕОРИТНЫЙ ДОЖДЬ',  color: '#FFB070' },
+        bird_flock:     { text: '≈ СТАЯ ПТИЦ',          color: '#D8D0C0' },
     };
 
     function showEventNotice(eventId) {
@@ -245,6 +372,9 @@
         wind_gust:      1.8,
         turbulence:     2.0,
         headwind:       2.0,
+        fog:            2.4,
+        meteor_shower:  2.4,
+        bird_flock:     2.2,
     };
     let eventNoticeDur     = 2.2;  // длительность текущего
     let eventNoticeEventId = '';   // id текущего события для switch в draw
@@ -489,6 +619,86 @@
                 break;
             }
 
+            // ТУМАН — клубы, стелющиеся по сторонам
+            case 'fog': {
+                ctx.globalAlpha = alpha;
+                for (let i = 0; i < 5; i++) {
+                    const phase = ((i/5 + t * 0.5) % 1);
+                    const fx = cx + (i - 2) * Math.round(26*s);
+                    const fy = cy + Math.sin(frame*0.04 + i) * Math.round(4*s);
+                    const fr = Math.round((14 + (i%3)*4) * s);
+                    ctx.beginPath();
+                    ctx.arc(fx, fy, fr, 0, Math.PI*2);
+                    ctx.fillStyle = `rgba(200,205,215,${0.25 * alpha})`;
+                    ctx.fill();
+                }
+                ctx.shadowBlur = 8; ctx.shadowColor = 'rgba(200,205,215,0.6)';
+                ctx.fillStyle  = '#C8D0DC';
+                ctx.font       = `bold ${Math.round(14*s)}px monospace`;
+                ctx.textAlign  = 'center'; ctx.textBaseline = 'middle';
+                ctx.fillText('▒ ТУМАН — ВИДИМОСТЬ ПАДАЕТ', cx, cy + Math.round(24*s));
+                ctx.shadowBlur = 0;
+                break;
+            }
+
+            // МЕТЕОРИТНЫЙ ДОЖДЬ — падающие огненные штрихи
+            case 'meteor_shower': {
+                ctx.globalAlpha = alpha;
+                for (let i = 0; i < 5; i++) {
+                    const phase = ((i/5 + t * 1.8) % 1);
+                    const mx = cx + (i - 2) * Math.round(22*s) - phase * Math.round(14*s);
+                    const my = cy - Math.round(24*s) + phase * Math.round(46*s);
+                    const ma = Math.sin(phase * Math.PI) * alpha;
+                    if (ma <= 0) continue;
+                    ctx.globalAlpha = ma;
+                    ctx.strokeStyle = 'rgba(255,150,90,0.9)';
+                    ctx.lineWidth = Math.round(2*s);
+                    ctx.lineCap = 'round';
+                    ctx.beginPath();
+                    ctx.moveTo(mx, my);
+                    ctx.lineTo(mx - Math.round(6*s), my - Math.round(12*s));
+                    ctx.stroke();
+                }
+                ctx.globalAlpha = alpha;
+                ctx.shadowBlur = 10; ctx.shadowColor = 'rgba(255,140,70,0.8)';
+                ctx.fillStyle  = '#FFB070';
+                ctx.font       = `bold ${Math.round(14*s)}px monospace`;
+                ctx.textAlign  = 'center'; ctx.textBaseline = 'middle';
+                ctx.fillText('☄ МЕТЕОРИТНЫЙ ДОЖДЬ', cx, cy + Math.round(26*s));
+                ctx.shadowBlur = 0;
+                break;
+            }
+
+            // ≈ СТАЯ ПТИЦ — силуэты-галочки пролетают
+            case 'bird_flock': {
+                ctx.globalAlpha = alpha;
+                for (let i = 0; i < 4; i++) {
+                    const phase = ((i/4 + t * 1.2) % 1);
+                    const bx = cx + ((phase % 1) - 0.5) * Math.round(160*s);
+                    const by = cy - Math.round(6*s) + (i%2===0 ? -4 : 4) * s;
+                    const ba = Math.sin((phase % 1) * Math.PI) * alpha;
+                    if (ba <= 0) continue;
+                    ctx.globalAlpha = ba;
+                    ctx.strokeStyle = 'rgba(216,208,192,0.9)';
+                    ctx.lineWidth = Math.round(1.6*s);
+                    ctx.lineCap = 'round';
+                    const bw = Math.round(9*s);
+                    ctx.beginPath();
+                    ctx.moveTo(bx - bw, by + bw*0.5);
+                    ctx.lineTo(bx, by);
+                    ctx.lineTo(bx + bw, by + bw*0.5);
+                    ctx.stroke();
+                }
+                ctx.globalAlpha = alpha;
+                ctx.shadowBlur = 6; ctx.shadowColor = 'rgba(216,208,192,0.5)';
+                ctx.fillStyle  = '#D8D0C0';
+                ctx.font       = `bold ${Math.round(14*s)}px monospace`;
+                ctx.textAlign  = 'center'; ctx.textBaseline = 'middle';
+                ctx.fillText('≈ СТАЯ ПТИЦ', cx, cy + Math.round(22*s));
+                ctx.shadowBlur = 0;
+                break;
+            }
+
             // дефолт — простая таблетка
             default: {
                 ctx.globalAlpha = alpha;
@@ -586,6 +796,80 @@
             ctx.beginPath();
             ctx.roundRect(barX, barY, barW * progress, Math.round(5*s), 3);
             ctx.fill();
+            ctx.restore();
+        }
+
+        // ТУМАН — оверлей на весь экран, плавно нарастает/спадает по краям события
+        if (activeEvent.id === 'fog') {
+            const t = activeEventTimer / activeEvent.duration;
+            const env = Math.min(1, Math.min(t, 1 - t) / 0.12); // плавный вход/выход
+            ctx.save();
+            ctx.globalAlpha = 1;
+            // плотнее к краям экрана, чище в центре — читается как "видимость сузилась"
+            const fogGrad = ctx.createRadialGradient(
+                LOGICAL_W * 0.5, LOGICAL_H * 0.45, LOGICAL_W * 0.15,
+                LOGICAL_W * 0.5, LOGICAL_H * 0.45, LOGICAL_W * 0.62
+            );
+            fogGrad.addColorStop(0, `rgba(195,200,210,${0.10 * env})`);
+            fogGrad.addColorStop(1, `rgba(195,200,210,${0.42 * env})`);
+            ctx.fillStyle = fogGrad;
+            ctx.fillRect(0, 0, LOGICAL_W, LOGICAL_H);
+            ctx.restore();
+        }
+
+        // МЕТЕОРЫ — падающие камни с огненным хвостом
+        if (activeEvent.id === 'meteor_shower' && activeEvent.meteors) {
+            const camY = getCameraY();
+            ctx.save();
+            for (let m of activeEvent.meteors) {
+                const mx = m.x - cameraX;
+                const my = m.y - camY;
+                const tailLen = 16 + m.size;
+                const ang = Math.atan2(m.vy, m.vx);
+
+                // огненный хвост
+                const tailGrad = ctx.createLinearGradient(
+                    mx, my,
+                    mx - Math.cos(ang) * tailLen, my - Math.sin(ang) * tailLen
+                );
+                tailGrad.addColorStop(0, 'rgba(255,200,120,0.8)');
+                tailGrad.addColorStop(1, 'rgba(255,120,60,0)');
+                ctx.strokeStyle = tailGrad;
+                ctx.lineWidth = m.size * 0.9;
+                ctx.lineCap = 'round';
+                ctx.beginPath();
+                ctx.moveTo(mx, my);
+                ctx.lineTo(mx - Math.cos(ang) * tailLen, my - Math.sin(ang) * tailLen);
+                ctx.stroke();
+
+                // само тело метеора
+                ctx.beginPath();
+                ctx.arc(mx, my, m.size, 0, Math.PI * 2);
+                ctx.fillStyle = 'rgba(255,180,110,0.95)';
+                ctx.fill();
+            }
+            ctx.restore();
+        }
+
+        // ≈ СТАЯ ПТИЦ — простые силуэты-галочки, машут крыльями
+        if (activeEvent.id === 'bird_flock' && activeEvent.birds) {
+            const camY = getCameraY();
+            ctx.save();
+            for (let b of activeEvent.birds) {
+                if (b.hit || b.passed) continue;
+                const bx = b.x - cameraX;
+                const by = b.y - camY;
+                const flap = Math.sin(b.wingPhase * 4) * 6; // взмах крыльев
+
+                ctx.beginPath();
+                ctx.moveTo(bx - 10, by + 4 + flap * 0.3);
+                ctx.quadraticCurveTo(bx - 4, by - flap, bx, by);
+                ctx.quadraticCurveTo(bx + 4, by - flap, bx + 10, by + 4 + flap * 0.3);
+                ctx.strokeStyle = 'rgba(60,55,50,0.85)';
+                ctx.lineWidth = 2;
+                ctx.lineCap = 'round';
+                ctx.stroke();
+            }
             ctx.restore();
         }
     }

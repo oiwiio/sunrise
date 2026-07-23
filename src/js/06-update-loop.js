@@ -30,7 +30,7 @@
         isStorm = (Math.floor(score / WCYCLE) % 2 === 1);
     }
 
-    // Молнии (только во время грозы)
+    // Молнии (только во время грозы) 
     // Три фазы: warning (прицел на земле + мигание сверху) → flash (весь экран) → strike (сам разряд).
     let lightnings      = [];
     let lightningTimer  = 0;
@@ -45,6 +45,22 @@
         nextLightningIn = 3 + Math.random() * 3; // 3–6 сек, как в ТЗ
     }
     rollNextLightning();
+
+    // искры при негативном попадании (турбулентность и т.д.) —
+    // вынесена на верхний уровень, чтобы её могли использовать и другие модули (10-events.js)
+    function addNegativeSpark(x, y) {
+        for (let i = 0; i < 4; i++) {
+            sparkParticles.push({
+                x: x - cameraX + (Math.random() - 0.5) * 18,
+                y: y - getCameraY() + (Math.random() - 0.5) * 18,
+                vx: (Math.random() - 0.5) * 2,
+                vy: (Math.random() - 0.5) * 2 - 0.5,
+                life: 0.7,
+                size: 2 + Math.random() * 3,
+                isNegative: true  // метка для отрисовки
+            });
+        }
+    }
 
     function spawnLightning() {
         // X — случайно впереди игрока, в пределах видимой области
@@ -258,20 +274,6 @@
             }
         }
 
-        function addNegativeSpark(x, y) {
-        for (let i = 0; i < 4; i++) {
-            sparkParticles.push({
-                x: x - cameraX + (Math.random() - 0.5) * 18,
-                y: y - getCameraY() + (Math.random() - 0.5) * 18,
-                vx: (Math.random() - 0.5) * 2,
-                vy: (Math.random() - 0.5) * 2 - 0.5,
-                life: 0.7,
-                size: 2 + Math.random() * 3,
-                isNegative: true  // метка для отрисовки
-            });
-        }
-    }
-        
         // потоки — нарастающая просадка и болтанка по мере приближения к ядру
         for (let i = 0; i < downdrafts.length; i++) {
             let d = downdrafts[i];
